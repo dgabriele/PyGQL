@@ -3,7 +3,8 @@ from graphql.language.source import Source
 
 
 class Query(object):
-    def __init__(self, parent=None, name=None, children=None, args=None, props=None):
+    def __init__(self, parent=None, name=None,
+                 children=None, args=None, props=None):
         self.parent = parent
         self.name = name
         self.children = children or {}
@@ -69,15 +70,10 @@ class Query(object):
         query.children = {}
         if ast_node.selection_set:
             for child in ast_node.selection_set.selections:
+                name = child.name.value
                 if child.selection_set:
-                    query.children[child.name.value] = cls._from_ast(child, query)
+                    query.children[name] = cls._from_ast(child, query)
                 else:
-                    query.props.append(child.name.value)
+                    query.props.append(name)
 
         return query
-
-
-if __name__ == '__main__':
-    q = Query.parse('{user(id:"123"){name, age}}')
-    print(q['user']['name'])
-    print(q['user']['age'])

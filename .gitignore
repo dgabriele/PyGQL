@@ -4,6 +4,7 @@
 *.swo
 *.swn
 *.egg-info
+.cache/
 __pycache__/
 /build/
 /dist/
