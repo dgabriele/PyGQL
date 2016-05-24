@@ -6,7 +6,7 @@ from pygql.tree import Tree
 __all__ = ['Graph']
 
 
-def Graph():
+def Graph(paths=None):
     """ This is a path registry/decorator factory.
     """
     class graph(object):
@@ -29,5 +29,8 @@ def Graph():
         def scan(*args, **kwargs):
             scanner = venusian.Scanner()
             scanner.scan(*args, **kwargs)
+
+    if paths is not None:
+        graph.scan(paths)
 
     return graph
