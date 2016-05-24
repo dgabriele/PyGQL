@@ -2,6 +2,14 @@ import pytest
 
 from pygql.query import Query
 
+@pytest.fixture(scope='function')
+def query_string():
+    return '''{
+        kitty:cat(id:"1001010") {color, name},
+        fish(id: "3434434") {
+            phylum, species, location {lng, lat}
+        }
+    }'''
 
 @pytest.fixture(scope='function')
 def query():
@@ -11,6 +19,7 @@ def query():
         children={
             'cat': Query(
                 name='cat',
+                alias='kitty',
                 args={'id': '1001010'},
                 props=['color', 'name'],
                 children={},
@@ -42,3 +51,11 @@ def query():
 
 def test_getitem(query):
     assert query['fish']['location'].props == ['lng', 'lat']
+
+
+def test_parse(query_string, query):
+    actual_query = Query.parse(query_string)
+    assert 'kitty' in actual_query.children
+    assert actual_query['kitty'].alias == 'kitty'
+    assert actual_query['kitty'].name == 'cat'
+    assert set(actual_query['kitty'].props) == {'color', 'name'}

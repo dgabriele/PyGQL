@@ -3,10 +3,11 @@ from graphql.language.source import Source
 
 
 class Query(object):
-    def __init__(self, parent=None, name=None,
+    def __init__(self, parent=None, alias=None, name=None,
                  children=None, args=None, props=None):
         self.parent = parent
         self.name = name
+        self.alias = alias
         self.children = children or {}
         self.props = props or []
         self.args = args or {}
@@ -30,7 +31,7 @@ class Query(object):
         """
         results = {}
         for k, v in query.children.items():
-            results[k] = cls._execute(request, v, node.children[k])
+            results[k] = cls._execute(request, v, node.children[v.name])
         if query.props:
             results.update(node.execute(request, query, results))
         return results
@@ -62,6 +63,10 @@ class Query(object):
         if ast_node.name:
             query.name = ast_node.name.value
 
+        # TODO: Check type of ast_node instead. i.e. is selectionset
+        if hasattr(ast_node, 'alias') and ast_node.alias is not None:
+            query.alias = ast_node.alias.value
+
         query.args = {}
         if hasattr(ast_node, 'arguments'):
             query.args = {
@@ -70,10 +75,15 @@ class Query(object):
         query.children = {}
         if ast_node.selection_set:
             for child in ast_node.selection_set.selections:
-                name = child.name.value
-                if child.selection_set:
-                    query.children[name] = cls._from_ast(child, query)
+                # store children under alias if alias exists,
+                # use the otherwise typename.
+                if hasattr(child, 'alias') and child.alias is not None:
+                    key = child.alias.value
                 else:
-                    query.props.append(name)
+                    key = child.name.value
+                if child.selection_set:
+                    query.children[key] = cls._from_ast(child, key)
+                else:
+                    query.props.append(key)
 
         return query

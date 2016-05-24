@@ -19,7 +19,10 @@ if __name__ == '__main__':
             company(id: "123") {
                 type, name
             },
-            user(id: "123") {
+            jim: user(id: "123") {
+                location {city, state}, first_name
+            },
+            bob: user(id: "123") {
                 location {city, state}, first_name
             }
         }''', graph)

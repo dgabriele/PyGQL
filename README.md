@@ -77,7 +77,10 @@ results = Query.execute(request, '''
         company(id: "123") {
             type, name
         },
-        user(id: "789") {
+        jim: user(id: "789") {
+            location {city, state}, first_name
+        }
+        bob: user(id: "145") {
             location {city, state}, first_name
         }
     }''', graph)
