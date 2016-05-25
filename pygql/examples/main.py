@@ -9,11 +9,11 @@ if __name__ == '__main__':
 
     request = None  # this is a mock request
 
-    # build the registry of valid query paths
-    # in the given module or package.
+    # build a registry of graph traversals or "paths"
+    # defined in the given module or package.
     graph.scan(basic)
 
-    # execute a query against the path registry
+    # execute a query against the graph
     results = Query.execute(request, '''
         {
             company(id: "123") {
