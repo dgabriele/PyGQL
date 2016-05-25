@@ -15,6 +15,10 @@ class Query(object):
     def __getitem__(self, key):
         return self.children.get(key)
 
+    @property
+    def is_terminal(self):
+        return not self.children
+
     @classmethod
     def execute(cls, request, query_str, graph):
         """ Execute a GraphQL query.
@@ -30,10 +34,18 @@ class Query(object):
         """ Recursively execute a Query tree.
         """
         results = {}
+
+        # raise exception if unrecognized fields or children are queried
+        node.validate(query)
+
+        # execute children queries first in order to pass them up to parent
         for k, v in query.children.items():
             results[k] = cls._execute(request, v, node.children[v.name])
+
+        # execute query, passing results of child queries
         if query.props:
             results.update(node.execute(request, query, results))
+
         return results
 
     @classmethod

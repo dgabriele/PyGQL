@@ -26,10 +26,8 @@ def Graph(paths=None):
         def __call__(self, func):
             def callback(scanner, name, obj):
                 _func = func  # encloses the func reference
-                if self.schema is not None:
-                    print('here')
-                    _func = self.schema.decorate(_func)
                 for node in self.nodes:
+                    node.schema = self.schema
                     node.execute = _func
             venusian.attach(func, callback)
             return func

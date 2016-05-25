@@ -9,6 +9,7 @@ __all__ = ['Tree']
 class Tree(object):
     def __init__(self, path=None):
         self.execute = None
+        self.schema = None
         self.children = defaultdict(Tree)
         self.path = path or ''
 
@@ -21,3 +22,7 @@ class Tree(object):
         for k in key:
             node = node.children[k]
         return node
+
+    def validate(self, query):
+        if self.schema is not None:
+            self.schema.validate_query(query)
