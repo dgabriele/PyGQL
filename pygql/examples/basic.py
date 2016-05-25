@@ -1,11 +1,16 @@
+import marshmallow as mm
+
+from pygql.validation import Schema
+
 from . import graph
 
 
-def select(row, cols):
-    return {k: row[k] for k in cols if k in row}
+class UserSchema(Schema):
+    first_name = mm.fields.Str()
+    last_name = mm.fields.Str()
 
 
-@graph(paths=['user'])
+@graph(paths=['user'], schema=UserSchema)
 def user(request, query, children):
     row = {'first_name': 'Daniel', 'last_name': 'Gabriele'}
     return select(row, query.props)
@@ -21,3 +26,7 @@ def company(request, query, children):
 def user_location(request, query, children):
     row = {'city': 'New York', 'state': 'NY', 'country':'USA'}
     return select(row, query.props)
+
+
+def select(row, cols):
+    return {k: row[k] for k in cols if k in row}
