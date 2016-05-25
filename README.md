@@ -1,7 +1,7 @@
 # Overview
 In the context of PyGQL, the term _path_ refers to a path in a query graph. For example `user.posts.comments`, would be a path to a collection of comments on a hypothetical user's post.
 
-Suppose you have a project structure with the following structure:
+Suppose you have a project with the following structure:
 
     my_project/
       |-__init__.py
@@ -103,4 +103,4 @@ def user(request, query, children):
     """Do something"""
 ```
 
-A `FieldValidationError` is raised if a requested field does not match a field set as a schema class attribute.
+A `FieldValidationError` is raised when a requested field does not match a field defined in the schema.
