@@ -1,6 +1,8 @@
 from graphql import parse
 from graphql.language.source import Source
 
+from pygql.exceptions import InvalidOperation
+
 
 class Query(object):
     def __init__(self, parent=None, alias=None, name=None,
@@ -58,15 +60,15 @@ class Query(object):
         if doc_ast.definitions:
             op_def = doc_ast.definitions[0]
             if op_def.operation != 'query':
-                raise Exception('unsupported op: {}'.format(op_def.name.value))
-            root = cls._from_ast(op_def)
+                raise InvalidOperation(op_def.name.value)
+            root = cls._build_query(op_def)
             root.name = None
             return root
 
         return None
 
     @classmethod
-    def _from_ast(cls, ast_node, parent=None):
+    def _build_query(cls, ast_node, parent=None):
         """ Process a graphql-core AST node while parsing.
         """
         query = cls(parent=parent)
@@ -94,7 +96,7 @@ class Query(object):
                 else:
                     key = child.name.value
                 if child.selection_set:
-                    query.children[key] = cls._from_ast(child, key)
+                    query.children[key] = cls._build_query(child, key)
                 else:
                     query.props.append(key)
 

@@ -22,15 +22,28 @@ class PyGQL_Exception(Exception):
 class FieldValidationError(PyGQL_Exception):
     code = 2
     default_payload = {
-        'message': 'You tried to query unrecognized fields.'
+        'message': 'You tried to query unrecognized fields'
     }
 
     def __init__(self, alias, type_name, field_names):
-        payload = {
+        super(FieldValidationError, self).__init__({
             'data': {
                 'fields': list(field_names),
                 'name': type_name,
                 'alias': alias
             }
-        }
-        super(FieldValidationError, self).__init__(payload)
+        })
+
+
+class InvalidOperation(PyGQL_Exception):
+    code = 3
+    default_payload = {
+        'message': 'Invalid GraphQL query operation'
+    }
+
+    def __init__(self, op_name):
+        super(InvalidOperation, self).__init__({
+            'data': {
+                'op': op_name
+            }
+        })

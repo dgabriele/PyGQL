@@ -24,7 +24,6 @@ if __name__ == '__main__':
             },
             bob: user(id: "123") {
                 location {city, state}, first_name,
-                order {a, bs}
             }
         }''', graph)
 
