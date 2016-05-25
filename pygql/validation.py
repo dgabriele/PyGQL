@@ -1,17 +1,17 @@
 import marshmallow
 
 from pygql.exceptions import FieldValidationError
-
+from pygql.decorators import reify
 
 class Schema(marshmallow.Schema):
 
-    @property
+    @reify
     def scalar_fields(self):
         return {k: v for k, v in self.fields.items()
         if not isinstance(v, marshmallow.fields.Nested)
     }
 
-    @property
+    @reify
     def nested_fields(self):
         return {k: v for k, v in self.fields.items()
         if not isinstance(v, marshmallow.fields.Nested)
