@@ -17,7 +17,7 @@ def query():
         name='root',
         props=None,
         children={
-            'cat': Query(
+            'kitty': Query(
                 name='cat',
                 alias='kitty',
                 args={'id': '1001010'},

@@ -3,14 +3,15 @@ import venusian
 from collections import defaultdict
 
 
-__all__ = ['Tree']
+__all__ = ['Node']
 
 
-class Tree(object):
+class Node(object):
     def __init__(self, path=None):
         self.execute = None
+        self.authorize = None
         self.schema = None
-        self.children = defaultdict(Tree)
+        self.children = defaultdict(Node)
         self.path = path or ''
 
     def __getitem__(self, key):
@@ -22,7 +23,3 @@ class Tree(object):
         for k in key:
             node = node.children[k]
         return node
-
-    def validate(self, query):
-        if self.schema is not None:
-            self.schema.validate_query(query)

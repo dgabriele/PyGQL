@@ -1,9 +1,12 @@
 import marshmallow as mm
 
 from pygql.validation import Schema
+from pygql.authorization import Authorization
+from pygql.exceptions import AuthorizationError
 
 from . import graph
 
+# example validation schemas
 
 class LocationSchema(Schema):
     """ Defines the valid fields for a location query.
@@ -18,12 +21,23 @@ class UserSchema(Schema):
     """
     first_name = mm.fields.Str()
     last_name = mm.fields.Str()
+    email = mm.fields.Str()
     location = mm.fields.Nested(LocationSchema)
 
 
-@graph(paths=['user'], schema=UserSchema)
+# example authorization
+
+class UserAuthorization(Authorization):
+    def __call__(self, request, query, node):
+        if 'email' in query.props:
+            raise AuthorizationError()
+
+
+# path registration
+
+@graph(paths=['user'], schema=UserSchema, authorize=UserAuthorization)
 def user(request, query, children):
-    row = {'first_name': 'Daniel', 'last_name': 'Gabriele'}
+    row = {'first_name': 'Foo', 'last_name': 'Bar', 'email': 'foo@bar.baz'}
     return select(row, query.props)
 
 

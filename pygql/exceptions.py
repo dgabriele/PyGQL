@@ -47,3 +47,17 @@ class InvalidOperation(PyGQL_Exception):
                 'op': op_name
             }
         })
+
+class AuthorizationError(PyGQL_Exception):
+    code = 4
+    default_payload = {
+        'message': 'not authorized'
+    }
+
+    def __init__(self, message=None):
+        super(AuthorizationError, self).__init__({
+            'message': message if message else 'not authorized',
+            'data': {
+                # TODO: include query information
+            }
+        })

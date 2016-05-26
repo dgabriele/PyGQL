@@ -2,11 +2,13 @@ from graphql import parse
 from graphql.language.source import Source
 
 from pygql.exceptions import InvalidOperation
+from pygql.validation import Schema
 
 
 class Query(object):
     def __init__(self, parent=None, alias=None, name=None,
                  children=None, args=None, props=None):
+
         self.parent = parent
         self.name = name
         self.alias = alias
@@ -14,8 +16,40 @@ class Query(object):
         self.props = props or []
         self.args = args or {}
 
+        assert isinstance(self.props, list)
+        assert isinstance(self.args, dict)
+        assert isinstance(self.children, dict)
+        if self.alias is not None:
+            assert isinstance(self.alias, str)
+        if self.parent is not None:
+            assert isinstance(self.parent, Query)
+
     def __getitem__(self, key):
         return self.children.get(key)
+
+    def validate(self, schema):
+        assert isinstance(schema, Schema)
+        self._validate_props(schema)
+        self._validate_children(schema)
+
+    def _validate_props(self, schema):
+        """ detect unrecognized field names
+        """
+        field_names = set(self.props)
+        unrecognized_field_names = field_names - schema.scalar_field_names
+        if unrecognized_field_names:
+            raise FieldValidationError(
+                query.alias, query.name, unrecognized_field_names)
+
+    def _validate_children(self, schema):
+        """ detect unrecognized child names
+        """
+        # detect unrecognized children
+        child_names = set(self.children.keys())
+        unrecognized_child_names = child_names - schema.nested_field_names
+        if unrecognized_child_names:
+            raise FieldValidationError(
+                query.alias, query.name, unrecognized_child_names)
 
     @property
     def is_terminal(self):
@@ -26,6 +60,7 @@ class Query(object):
         """ Execute a GraphQL query.
 
             Args:
+                - request: an HTTP Request object from your web framework
                 - query_str: A GraphQL query statement
                 - graph: An instance of `pygql.Graph`
         """
@@ -33,12 +68,17 @@ class Query(object):
 
     @classmethod
     def _execute(cls, request, query, node):
-        """ Recursively execute a Query tree.
+        """ Recursively execute a Query.
         """
         results = {}
 
         # raise exception if unrecognized fields or children are queried
-        node.validate(query)
+        if node.schema is not None:
+            query.validate(node.schema)
+
+        # authorize request to query this node
+        if node.authorize is not None:
+            node.authorize(request, query, node)
 
         # execute children queries first in order to pass them up to parent
         for k, v in query.children.items():
@@ -53,7 +93,7 @@ class Query(object):
     @classmethod
     def parse(cls, query):
         """ Recursively repackage graphql-core AST nodes as Query objects,
-            Returning the root Query node.
+            Returning the root Query.
         """
         doc_ast = parse(Source(query))
 
@@ -62,7 +102,6 @@ class Query(object):
             if op_def.operation != 'query':
                 raise InvalidOperation(op_def.name.value)
             root = cls._build_query(op_def)
-            root.name = None
             return root
 
         return None
@@ -73,7 +112,6 @@ class Query(object):
         """
         query = cls(parent=parent)
 
-        query.name = None
         if ast_node.name:
             query.name = ast_node.name.value
 
@@ -96,7 +134,7 @@ class Query(object):
                 else:
                     key = child.name.value
                 if child.selection_set:
-                    query.children[key] = cls._build_query(child, key)
+                    query.children[key] = cls._build_query(child, query)
                 else:
                     query.props.append(key)
 

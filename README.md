@@ -20,22 +20,25 @@ graph = Graph()
 
 
 ## Registering Paths
-Now in `paths.py`, you would register callables with valid paths
+Now in `paths.py`, you would register some paths.
 
 ```python
 from . import graph
 
 @graph(paths=['user'])
 def user(request, query, children):
-  '''Fetch a projection of user data. Return JSON serializable object.'''
+  """ Return a projection of user data.
+  """
 
 @graph(paths=['user.location'])
 def user_location(request, query, children):
-  '''Fetch a projection of user_location data.'''
+  """ Return a projection of location data.
+  """
 
 @graph(paths=['company', 'user.company'])
 def company(request, query, children):
-  '''Fetch a projection of company data.'''
+  """ Return a projection of company data.
+  """
 ```
 
 ### Arguments
@@ -47,10 +50,10 @@ This is an HTTP Request object from your web framework.
 This is an instance of `pygql.Query`. It contains the arguments to the graph node as well as a list of the queried fields through the `props` attribute. It also has a recusive mapping to child Query objects in the `children` attribute.
 
 #### `children`
-Suppose you have two distinct paths called `user` and `user.company`. When the time comes to execute a query, a depth-first traversal is performed, and the intermediate results are passed back up to the parent node. In the example above, `children` would be a dictionary, mapping `'company'` to the data returned by the callable registered with the `user.company` path.
+Suppose that you have two distinct paths: `user` and `user.company`. When executing a query for `user.company`, a depth-first traversal is performed. The computed result of each node is passed up to its parent. In the example above, the `children` argument to the `user` node would be a Python dict, mapping `'company'` to the result returned by the callable registered with the `user.company` path.
 
 
-## Initializing The Graph & Executing Queries
+## Graph Initialization & Query Execution
 In `app.py`, you would tell the path registry where your paths can be found, which is either a package or a module. From here, you can execute queries against the graph.
 
 ```python
@@ -81,7 +84,7 @@ print(results)
 ## Exceptions
 All PyGQL exceptions use a JSON serialized message. See `exceptions.py`.
 
-## Query validation
+## Request Validation
 One thing you might want to do is ensure that the fields queried come from an allowed set. PyGQL uses the `marshmallow` validation library to do this.
 
 ```python
@@ -100,7 +103,28 @@ class LocationSchema(Schema):
 
 @graph(paths=['user'], schema=UserSchema)  # NOTE: the schema param
 def user(request, query, children):
-    """Do something"""
+    """ Return user projection.
+    """
 ```
 
 A `FieldValidationError` is raised when a requested field does not match a field defined in the schema.
+
+## Authorization
+Currently, arbitrary authorization logic can be assigned to each node in the graph. This is done by setting the `authorize` parameter of the `@graph` decorator. This parameter must be an `Authorization` subclass and raise an `AuthorizationError` when appropriate. For example:
+
+```python
+from pygql.authorization import Authorization
+from pygql.exceptions import AuthorizationError
+
+class CompanyAuthorization(Authorization):
+  """ Authorize request and query to the given node.
+  """
+  def __call__(self, request, query, node):
+    if 'foo' in query.props:
+      raise AuthorizationError()
+
+@graph(paths=['user'], authorize=CompanyAuthorization)  # NOTE: the authorize param
+def company(request, query, children):
+    """ Return company projection.
+    """
+```

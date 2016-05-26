@@ -1,7 +1,9 @@
 import marshmallow
 
+from memoized_property import memoized_property
+
 from pygql.exceptions import FieldValidationError
-from pygql.decorators import memoized_property
+
 
 class Schema(marshmallow.Schema):
 
@@ -17,20 +19,16 @@ class Schema(marshmallow.Schema):
         if isinstance(v, marshmallow.fields.Nested)
     }
 
-    def validate_query(self, query):
-        valid_field_names = set(self.scalar_fields.keys())
-        valid_child_names = set(self.nested_fields.keys())
+    @memoized_property
+    def scalar_field_names(self):
+        valid_field_names = set()
+        for k, v in self.scalar_fields.items():
+            valid_field_names.add(v.load_from or k)
+        return valid_field_names
 
-        # detect unrecognized props
-        field_names = set(query.props)
-        unrecognized_field_names = field_names - valid_field_names
-        if unrecognized_field_names:
-            raise FieldValidationError(
-                query.alias, query.name, unrecognized_field_names)
-
-        # detect unrecognized children
-        child_names = set(query.children.keys())
-        unrecognized_child_names = child_names - valid_child_names
-        if unrecognized_child_names:
-            raise FieldValidationError(
-                query.alias, query.name, unrecognized_child_names)
+    @memoized_property
+    def nested_field_names(self):
+        valid_child_names = set()
+        for k, v in self.nested_fields.items():
+            valid_child_names.add(v.load_from or k)
+        return valid_child_names
