@@ -8,13 +8,15 @@ from pygql.authorization import Authorization
 __all__ = ['Graph']
 
 
-def Graph(paths=None):
-    """ This is a path registry/decorator factory. This is a factory so that
-        multiple "graphs" can be used simultaneously rather than a single
-        global one.
+def Graph():
+    """
+    This is a path registry/decorator factory. This is a factory so that
+    multiple "graphs" can be used simultaneously rather than a single global
+    one.
     """
     class graph(object):
-        """ Graph traversal/path registration decorator.
+        """
+        Graph traversal/path registration decorator.
         """
         # `root` is a global registry of GraphQL target callables stored in
         # a tree. It is the entry point to every defined path in the graph.
@@ -33,7 +35,11 @@ def Graph(paths=None):
             # initialize each path in global tree. `self.root['a', 'b']`yields
             # a nesting of Node objects, where the `b` node is an element of
             # `a.children`.
-            self._nodes = [self.root[path.split('.')] for path in paths]
+            self._nodes = []
+            for path in paths:
+                node = self.root[path.split('.')]
+                node.path = path
+                self._nodes.append(node)
 
             self._schema = None
             if schema is not None:
@@ -65,13 +71,10 @@ def Graph(paths=None):
 
         @staticmethod
         def scan(*args, **kwargs):
-            """ Run the callbacks registered in `self.__call__`.
+            """
+            Run the callbacks registered in `self.__call__`.
             """
             scanner = venusian.Scanner()
             scanner.scan(*args, **kwargs)
-
-    # register paths here for convenience if desired
-    if paths is not None:
-        graph.scan(paths)
 
     return graph

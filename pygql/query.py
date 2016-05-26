@@ -1,7 +1,7 @@
 from graphql import parse
 from graphql.language.source import Source
 
-from pygql.exceptions import InvalidOperation
+from pygql.exceptions import InvalidOperation, FieldValidationError
 from pygql.validation import Schema
 
 
@@ -33,23 +33,28 @@ class Query(object):
         self._validate_children(schema)
 
     def _validate_props(self, schema):
-        """ detect unrecognized field names
+        """ detect unrecognized field names. replace requested props list with
+            props that are understood by the node execution function
         """
+        # the fields queried by the user may not directly correspond to the
+        # names of the fields/columns in the storage backend.
+        self.props = schema.resolve_scalar_field_names(self.props)
+
+        # detect unrecognized props
         field_names = set(self.props)
         unrecognized_field_names = field_names - schema.scalar_field_names
         if unrecognized_field_names:
-            raise FieldValidationError(
-                query.alias, query.name, unrecognized_field_names)
+            raise FieldValidationError(self, unrecognized_field_names)
 
     def _validate_children(self, schema):
         """ detect unrecognized child names
         """
-        # detect unrecognized children
         child_names = set(self.children.keys())
+
+        # detect unrecognized children
         unrecognized_child_names = child_names - schema.nested_field_names
         if unrecognized_child_names:
-            raise FieldValidationError(
-                query.alias, query.name, unrecognized_child_names)
+            raise FieldValidationError(self, unrecognized_child_names)
 
     @property
     def is_terminal(self):
@@ -86,7 +91,10 @@ class Query(object):
 
         # execute query, passing results of child queries
         if query.props:
-            results.update(node.execute(request, query, results))
+            result = node.execute(request, query, results)
+            if node.schema is not None:
+                result, errors = node.schema.load(result)
+            results.update(result)
 
         return results
 

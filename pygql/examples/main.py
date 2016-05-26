@@ -20,7 +20,7 @@ if __name__ == '__main__':
                 type, name
             },
             jim: user(id: "123") {
-                location {city, state}, first_name
+                location {city, state}, first_name, id
             },
             bob: user(id: "123") {
                 location {city, state}, first_name,

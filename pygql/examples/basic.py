@@ -19,6 +19,7 @@ class LocationSchema(Schema):
 class UserSchema(Schema):
     """ Defines the valid fields for a user query.
     """
+    id = mm.fields.Str(load_from='public_id')
     first_name = mm.fields.Str()
     last_name = mm.fields.Str()
     email = mm.fields.Str()
@@ -37,7 +38,12 @@ class UserAuthorization(Authorization):
 
 @graph(paths=['user'], schema=UserSchema, authorize=UserAuthorization)
 def user(request, query, children):
-    row = {'first_name': 'Foo', 'last_name': 'Bar', 'email': 'foo@bar.baz'}
+    row = {
+        'public_id': 'ABC123',
+        'first_name': 'Foo',
+        'last_name': 'Bar',
+        'email': 'foo@bar.baz'
+    }
     return select(row, query.props)
 
 

@@ -25,12 +25,12 @@ class FieldValidationError(PyGQL_Exception):
         'message': 'You tried to query unrecognized fields'
     }
 
-    def __init__(self, alias, type_name, field_names):
+    def __init__(self, query, field_names):
         super(FieldValidationError, self).__init__({
             'data': {
                 'fields': list(field_names),
-                'name': type_name,
-                'alias': alias
+                'name': query.name,
+                'alias': query.alias
             }
         })
 

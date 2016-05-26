@@ -32,3 +32,19 @@ class Schema(marshmallow.Schema):
         for k, v in self.nested_fields.items():
             valid_child_names.add(v.load_from or k)
         return valid_child_names
+
+    def resolve_scalar_field_names(self, field_names):
+        computed_field_names = []
+        for k in field_names:
+            v = self.scalar_fields.get(k)
+            if v is not None:
+                computed_field_names.append(v.load_from or k)
+        return computed_field_names
+
+    def resolve_nested_field_names(self, field_names):
+        computed_field_names = []
+        for k in field_names:
+            v = self.nested_fields.get(k)
+            if v is not None:
+                computed_field_names.append(v.load_from or k)
+        return computed_field_names
