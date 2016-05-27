@@ -49,7 +49,10 @@ class Query(object):
     def _validate_children(self, schema):
         """ detect unrecognized child names
         """
-        child_names = set(self.children.keys())
+        # we use child node `name` attributes instead of the keys in
+        # `children` because the keys are a mixture of valid field names
+        # as well as field aliases; whereas node.name is always the field name.
+        child_names = set(v.name for v in self.children.values())
 
         # detect unrecognized children
         unrecognized_child_names = child_names - schema.nested_field_names

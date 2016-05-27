@@ -23,7 +23,7 @@ if __name__ == '__main__':
                 location {city, state}, first_name, id
             },
             bob: user(id: "123") {
-                location {city, state}, first_name,
+                loc: location {city, state}, first_name,
             }
         }''', graph)
 
