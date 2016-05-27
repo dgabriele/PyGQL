@@ -26,17 +26,17 @@ Now in `paths.py`, you would register some paths.
 from . import graph
 
 @graph(paths=['user'])
-def user(request, gql_query, children):
+def user(request, node, children):
   """ Return a projection of user data.
   """
 
 @graph(paths=['user.location'])
-def user_location(request, gql_query, children):
+def user_location(request, node, children):
   """ Return a projection of location data.
   """
 
 @graph(paths=['company', 'user.company'])
-def company(request, gql_query, children):
+def company(request, node, children):
   """ Return a projection of company data.
   """
 ```
@@ -46,8 +46,8 @@ def company(request, gql_query, children):
 #### `request`
 This is an HTTP Request object from your web framework.
 
-#### `gql_query`
-This is an instance of `pygql.Query`. It contains the arguments to the node as well as a list of the fields queried, accessed through the `fields` attribute. It also has a recusive mapping to child Query objects in the `children` attribute.
+#### `node`
+This is an instance of `pygql.Node`. It contains the arguments to the node as well as a list of the fields queried, accessed through the `fields` attribute. It also has a recursive mapping to child Query objects in the `children` attribute.
 
 #### `children`
 Suppose that you have two distinct paths: `user` and `user.company`. When executing a query for `user.company`, a depth-first traversal is performed. The computed result of each node is passed up to its parent. In the example above, the `children` argument to the `user` node would be a Python dict, mapping `'company'` to the result returned by the callable registered with the `user.company` path.
@@ -57,7 +57,6 @@ Suppose that you have two distinct paths: `user` and `user.company`. When execut
 In `app.py`, you would tell the path registry where your paths can be found, which is either a package or a module. From here, you can execute queries against the graph.
 
 ```python
-from pygql import Query
 from . import paths, graph
 
 # build a registry of graph traversals or "paths"
@@ -65,7 +64,7 @@ from . import paths, graph
 graph.scan(paths)
 
 # execute a query against the graph
-results = Query.execute(request, '''
+results = graph.execute(request, '''
     {
         company(id: "123") {
             type, name
@@ -76,7 +75,7 @@ results = Query.execute(request, '''
         bob: user(id: "145") {
             location {city, state}, first_name
         }
-    }''', graph)
+    }''')
 
 print(results)
 ```
@@ -102,7 +101,7 @@ class LocationSchema(Schema):
     country = fields.Str()
 
 @graph(paths=['user'], schema=UserSchema)  # Note the `schema` param
-def user(request, gql_query, children):
+def user(request, node, children):
     """ Return user projection.
     """
 ```
@@ -119,12 +118,12 @@ from pygql.exceptions import AuthorizationError
 class CompanyAuthorization(Authorization):
   """ Authorize request and query to the given node.
   """
-  def __call__(self, request, gql_query, node):
-    if 'password' in gql_query.fields:
+  def __call__(self, request, node):
+    if 'password' in node.fields:
       raise AuthorizationError()
 
 @graph(paths=['user'], authorize=CompanyAuthorization)  # Note the `authorize` param
-def company(request, gql_query, children):
+def company(request, node, children):
     """ Return company projection.
     """
 ```

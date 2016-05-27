@@ -1,10 +1,12 @@
 from .graph import Graph
-from .query import Query
+from .node import Node
 from .validation import Schema
+from .authorization import Authorization
 
 
 __all__ = [
     'Graph',
-    'Query',
+    'Node',
     'Schema',
+    'Authorization',
 ]

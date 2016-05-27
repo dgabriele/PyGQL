@@ -1,6 +1,5 @@
 from pprint import pprint
 
-from pygql.query import Query
 from pygql.examples import graph
 
 
@@ -14,7 +13,7 @@ if __name__ == '__main__':
     graph.scan(basic)
 
     # execute a query against the graph
-    results = Query.execute(request, '''
+    results = graph.execute(request, '''
         {
             company(id: "123") {
                 type, name
@@ -25,6 +24,6 @@ if __name__ == '__main__':
             bob: user(id: "123") {
                 loc: location {city, state}, first_name,
             }
-        }''', graph)
+        }''')
 
     pprint(results, indent=2)
