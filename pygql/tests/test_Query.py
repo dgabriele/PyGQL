@@ -15,24 +15,24 @@ def query_string():
 def query():
     root = Query(
         name='root',
-        props=None,
+        fields=None,
         children={
             'kitty': Query(
                 name='cat',
                 alias='kitty',
                 args={'id': '1001010'},
-                props=['color', 'name'],
+                fields=['color', 'name'],
                 children={},
             ),
             'fish': Query(
                 name='fish',
                 args={'id': '3434434'},
-                props=['phylum', 'species'],
+                fields=['phylum', 'species'],
                 children={
                     'location': Query(
                         name='location',
                         args=None,
-                        props=['lng', 'lat'],
+                        fields=['lng', 'lat'],
                         children={},
                     )
                 }
@@ -50,7 +50,7 @@ def query():
 
 
 def test_getitem(query):
-    assert query['fish']['location'].props == ['lng', 'lat']
+    assert query['fish']['location'].fields == ['lng', 'lat']
 
 
 def test_parse(query_string, query):
@@ -58,4 +58,4 @@ def test_parse(query_string, query):
     assert 'kitty' in actual_query.children
     assert actual_query['kitty'].alias == 'kitty'
     assert actual_query['kitty'].name == 'cat'
-    assert set(actual_query['kitty'].props) == {'color', 'name'}
+    assert set(actual_query['kitty'].fields) == {'color', 'name'}

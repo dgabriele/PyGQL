@@ -26,17 +26,17 @@ Now in `paths.py`, you would register some paths.
 from . import graph
 
 @graph(paths=['user'])
-def user(request, query, children):
+def user(request, gql_query, children):
   """ Return a projection of user data.
   """
 
 @graph(paths=['user.location'])
-def user_location(request, query, children):
+def user_location(request, gql_query, children):
   """ Return a projection of location data.
   """
 
 @graph(paths=['company', 'user.company'])
-def company(request, query, children):
+def company(request, gql_query, children):
   """ Return a projection of company data.
   """
 ```
@@ -46,8 +46,8 @@ def company(request, query, children):
 #### `request`
 This is an HTTP Request object from your web framework.
 
-#### `query`
-This is an instance of `pygql.Query`. It contains the arguments to the graph node as well as a list of the queried fields through the `props` attribute. It also has a recusive mapping to child Query objects in the `children` attribute.
+#### `gql_query`
+This is an instance of `pygql.Query`. It contains the arguments to the node as well as a list of the fields queried, accessed through the `fields` attribute. It also has a recusive mapping to child Query objects in the `children` attribute.
 
 #### `children`
 Suppose that you have two distinct paths: `user` and `user.company`. When executing a query for `user.company`, a depth-first traversal is performed. The computed result of each node is passed up to its parent. In the example above, the `children` argument to the `user` node would be a Python dict, mapping `'company'` to the result returned by the callable registered with the `user.company` path.
@@ -101,8 +101,8 @@ class LocationSchema(Schema):
     state = fields.Str()
     country = fields.Str()
 
-@graph(paths=['user'], schema=UserSchema)  # NOTE: the schema param
-def user(request, query, children):
+@graph(paths=['user'], schema=UserSchema)  # Note the `schema` param
+def user(request, gql_query, children):
     """ Return user projection.
     """
 ```
@@ -119,12 +119,12 @@ from pygql.exceptions import AuthorizationError
 class CompanyAuthorization(Authorization):
   """ Authorize request and query to the given node.
   """
-  def __call__(self, request, query, node):
-    if 'foo' in query.props:
+  def __call__(self, request, gql_query, node):
+    if 'password' in gql_query.fields:
       raise AuthorizationError()
 
-@graph(paths=['user'], authorize=CompanyAuthorization)  # NOTE: the authorize param
-def company(request, query, children):
+@graph(paths=['user'], authorize=CompanyAuthorization)  # Note the `authorize` param
+def company(request, gql_query, children):
     """ Return company projection.
     """
 ```

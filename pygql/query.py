@@ -7,16 +7,16 @@ from pygql.validation import Schema
 
 class Query(object):
     def __init__(self, parent=None, alias=None, name=None,
-                 children=None, args=None, props=None):
+                 children=None, args=None, fields=None):
 
         self.parent = parent
         self.name = name
         self.alias = alias
         self.children = children or {}
-        self.props = props or []
+        self.fields = fields or []
         self.args = args or {}
 
-        assert isinstance(self.props, list)
+        assert isinstance(self.fields, list)
         assert isinstance(self.args, dict)
         assert isinstance(self.children, dict)
         if self.alias is not None:
@@ -29,19 +29,19 @@ class Query(object):
 
     def validate(self, schema):
         assert isinstance(schema, Schema)
-        self._validate_props(schema)
+        self._validate_fields(schema)
         self._validate_children(schema)
 
-    def _validate_props(self, schema):
-        """ detect unrecognized field names. replace requested props list with
-            props that are understood by the node execution function
+    def _validate_fields(self, schema):
+        """ detect unrecognized field names. replace requested fields list with
+            fields that are understood by the node execution function
         """
         # the fields queried by the user may not directly correspond to the
         # names of the fields/columns in the storage backend.
-        self.props = schema.resolve_scalar_field_names(self.props)
+        self.fields = schema.resolve_scalar_field_names(self.fields)
 
-        # detect unrecognized props
-        field_names = set(self.props)
+        # detect unrecognized fields
+        field_names = set(self.fields)
         unrecognized_field_names = field_names - schema.scalar_field_names
         if unrecognized_field_names:
             raise FieldValidationError(self, unrecognized_field_names)
@@ -93,7 +93,7 @@ class Query(object):
             results[k] = cls._execute(request, v, node.children[v.name])
 
         # execute query, passing results of child queries
-        if query.props:
+        if query.fields:
             result = node.execute(request, query, results)
             if node.schema is not None:
                 result, errors = node.schema.load(result)
@@ -147,6 +147,6 @@ class Query(object):
                 if child.selection_set:
                     query.children[key] = cls._build_query(child, query)
                 else:
-                    query.props.append(key)
+                    query.fields.append(key)
 
         return query

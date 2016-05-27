@@ -29,34 +29,34 @@ class UserSchema(Schema):
 # example authorization
 
 class UserAuthorization(Authorization):
-    def __call__(self, request, query, node):
-        if 'email' in query.props:
+    def __call__(self, request, gql_query, gql_node):
+        if 'email' in gql_query.fields:
             raise AuthorizationError()
 
 
 # path registration
 
 @graph(paths=['user'], schema=UserSchema, authorize=UserAuthorization)
-def user(request, query, children):
+def user(request, gql_query, children):
     row = {
         'public_id': 'ABC123',
         'first_name': 'Foo',
         'last_name': 'Bar',
         'email': 'foo@bar.baz'
     }
-    return select(row, query.props)
+    return select(row, gql_query.fields)
 
 
 @graph(paths=['company'])
-def company(request, query, children):
+def company(request, gql_query, children):
     row = {'type': 'LLC', 'name': 'Generic Company'}
-    return select(row, query.props)
+    return select(row, gql_query.fields)
 
 
 @graph(paths=['user.location'])
-def user_location(request, query, children):
+def user_location(request, gql_query, children):
     row = {'city': 'New York', 'state': 'NY', 'country':'USA'}
-    return select(row, query.props)
+    return select(row, gql_query.fields)
 
 
 def select(row, cols):

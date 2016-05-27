@@ -18,19 +18,17 @@ class Node(object):
     dict are the names of the corresponding nodes.
     """
     def __init__(self, path=None):
-        # callback function registered to the path
+        """
+            - `self.execute`: callback function registered with the path
+            - `self.authorize`: instance of authorization.Authorization
+            - `self.schema`: instance of validation.Schema
+            - `self.children`: child nodes do not include queried fields
+            - `self.path`: dotted path to this node
+        """
         self.execute = None
-
-        # instance of authorization.Authorization
         self.authorize = None
-
-        # instance of validation.Schema
         self.schema = None
-
-        # child nodes do not include queried fields
         self.children = defaultdict(Node)
-
-        # dotted path to this node
         self.path = path or ''
 
     def __getitem__(self, key):
