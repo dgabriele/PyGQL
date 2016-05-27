@@ -24,6 +24,9 @@ def Graph():
         # a tree. It is the entry point to every defined path in the graph.
         root = Context()
 
+        # set of all dotted paths registered with the graph.
+        contexts = set()
+
         def __init__(self, paths, schema=None, authorize=None):
             """
             Args:
@@ -42,6 +45,7 @@ def Graph():
                 ctx = self.root[path.split('.')]
                 ctx.path = path
                 self._ctxs.append(ctx)
+                self.contexts.add(ctx)
 
             self._schema = None
             if schema is not None:

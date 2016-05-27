@@ -27,3 +27,4 @@ if __name__ == '__main__':
         }''')
 
     pprint(results, indent=2)
+    pprint(graph.contexts)
