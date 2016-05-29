@@ -95,9 +95,15 @@ class Node(object):
         # execute node, passing results of child execution results
         if node.fields:
             result = ctx.execute(request, node, results)
+            if result is None:
+                result = {}  # to avoid doing results.update(None)
             if ctx.schema is not None:
                 result, errors = ctx.schema.load(result)
-            results.update(result)
+            if isinstance(result, dict):
+                results.update(result)
+            else:
+                # i.e. result is most likely a list.
+                return result
 
         return results
 

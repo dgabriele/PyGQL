@@ -1,9 +1,9 @@
 import pytest
 
-from pygql.query import Query
+from pygql.node import Node
 
 @pytest.fixture(scope='function')
-def query_string():
+def node_string():
     return '''{
         kitty:cat(id:"1001010") {color, name},
         fish(id: "3434434") {
@@ -12,24 +12,24 @@ def query_string():
     }'''
 
 @pytest.fixture(scope='function')
-def query():
-    root = Query(
+def node():
+    root = Node(
         name='root',
         fields=None,
         children={
-            'kitty': Query(
+            'kitty': Node(
                 name='cat',
                 alias='kitty',
                 args={'id': '1001010'},
                 fields=['color', 'name'],
                 children={},
             ),
-            'fish': Query(
+            'fish': Node(
                 name='fish',
                 args={'id': '3434434'},
                 fields=['phylum', 'species'],
                 children={
-                    'location': Query(
+                    'location': Node(
                         name='location',
                         args=None,
                         fields=['lng', 'lat'],
@@ -49,13 +49,13 @@ def query():
     return root
 
 
-def test_getitem(query):
-    assert query['fish']['location'].fields == ['lng', 'lat']
+def test_getitem(node):
+    assert node['fish']['location'].fields == ['lng', 'lat']
 
 
-def test_parse(query_string, query):
-    actual_query = Query.parse(query_string)
-    assert 'kitty' in actual_query.children
-    assert actual_query['kitty'].alias == 'kitty'
-    assert actual_query['kitty'].name == 'cat'
-    assert set(actual_query['kitty'].fields) == {'color', 'name'}
+def test_parse(node_string, node):
+    actual_node = Node.parse(node_string)
+    assert 'kitty' in actual_node.children
+    assert actual_node['kitty'].alias == 'kitty'
+    assert actual_node['kitty'].name == 'cat'
+    assert set(actual_node['kitty'].fields) == {'color', 'name'}
