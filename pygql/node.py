@@ -125,7 +125,7 @@ class Node(object):
                 results.update(result)
             elif isinstance(result, (list, tuple, set)):
                 if schema is not None:
-                    result = [x.data for x in schema.load(result)]
+                    result = [schema.load(x).data for x in result]
                 return result
             else:
                 raise Exception('illegal path result type')
