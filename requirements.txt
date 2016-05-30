@@ -4,3 +4,4 @@ venusian>=1.0
 pytest>=2.9.1
 memoized-property==1.0.2
 marshmallow==2.7.3
+mock==2.0.0
