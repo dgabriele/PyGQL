@@ -1,8 +1,15 @@
+from collections import Counter
+
 from graphql import parse
 from graphql.language.source import Source
 
-from pygql.exceptions import InvalidOperation, FieldValidationError
-from pygql.validation import Schema
+from pygql.exceptions import (
+    InvalidOperation,
+    FieldValidationError,
+    AmbiguousFieldError,
+)
+
+from pygql.schema import Schema
 
 
 class Node(object):
@@ -22,10 +29,13 @@ class Node(object):
         self.fields = fields or []
         self.args = args or {}
         self.state = state or {}
+        self.context = None
 
     def __getitem__(self, key):
         return self.children.get(key)
 
+    # TODO: merge this logic to reduce number of times the field names
+    # are iterated through.
     def validate(self, schema):
         assert isinstance(schema, Schema)
         self._validate_fields(schema)
@@ -33,30 +43,36 @@ class Node(object):
 
     def _validate_fields(self, schema):
         """ detect unrecognized field names. replace requested fields list with
-            fields that are understood by the ctx execution function
+            fields that are understood by the path execution function
         """
-        # the fields queried by the user may not directly correspond to the
-        # names of the fields/columns in the storage backend.
-        self.fields = schema.resolve_scalar_field_names(self.fields)
+        valid_names, unrec_names = schema.resolve_scalar_field_names(self.fields)
+        if unrec_names:
+            raise FieldValidationError(self, unrec_names)
+        self._raise_for_duplicate_fields(valid_names)
+        self.fields = valid_names
 
-        # detect unrecognized fields
-        field_names = set(self.fields)
-        unrecognized_field_names = field_names - schema.scalar_field_names
-        if unrecognized_field_names:
-            raise FieldValidationError(self, unrecognized_field_names)
 
     def _validate_children(self, schema):
         """ detect unrecognized child names
         """
-        # we use child ctx `name` attributes instead of the keys in
+        # we use child path `name` attributes instead of the keys in
         # `children` because the keys are a mixture of valid field names
-        # as well as field aliases; whereas ctx.name is always the field name.
-        child_names = set(v.name for v in self.children.values())
+        # as well as field aliases; whereas path.name is always the field name.
+        names = set(v.name for v in self.children.values())
+        valid_names, unrec_names = schema.resolve_nested_field_names(names)
+        if unrec_names:
+            raise FieldValidationError(self, unrec_names)
+        self._raise_for_duplicate_fields(valid_names)
 
-        # detect unrecognized children
-        unrecognized_child_names = child_names - schema.nested_field_names
-        if unrecognized_child_names:
-            raise FieldValidationError(self, unrecognized_child_names)
+    def _raise_for_duplicate_fields(self, field_names):
+        counter = Counter()
+        duplicate_names = []
+        for k in field_names:
+            counter[k] += 1
+            if counter[k] == 2:
+                duplicate_names.append(k)
+        if duplicate_names:
+            raise AmbiguousFieldError(self, duplicate_names)
 
     @property
     def is_terminal(self):
@@ -69,41 +85,50 @@ class Node(object):
             Args:
                 - request: an HTTP Request object from your web framework
                 - query: A GraphQL query string
-                - graph: An instance of `pygql.Graph`
+                - graph: An instance of `pygql.graph.Context`. This is distinct
+                  from user-provided context classes set as @graph params. This
+                  is context from the POV of GraphQL query execution.
         """
-        return cls._execute(request, cls.parse(query), ctx=graph.root)
+        return cls._execute(request, cls.parse(query), path=graph.root)
 
     @classmethod
-    def _execute(cls, request, node, ctx):
+    def _execute(cls, request, node, path):
         """
         Recursively execute a Node.
         """
         results = {}
 
-        # raise exception if unrecognized fields or children are queried
-        if ctx.schema is not None:
-            node.validate(ctx.schema)
+        # Authorize the request to the node. If success, validate the queried
+        # field and child node names against a return Schema object.
+        schema = None
+        if path.context_class is not None:
+            node.context = path.context_class(request, node)
+            schema = node.context.authorize(request, node)
+            if schema is not None:
+                node.validate(schema)
 
-        # authorize request at this node
-        if ctx.authorize is not None:
-            ctx.authorize(request, node)
-
-        # execute child nodes first to pass them up to parent next
+        # Execute child nodes in depth-first traversal in order to pass the
+        # results back up to the parent (i.e. `node`).
         for k, v in node.children.items():
-            results[k] = cls._execute(request, v, ctx.children[v.name])
+            results[k] = cls._execute(request, v, path.children[v.name])
 
-        # execute node, passing results of child execution results
+        # Execute at node-level, passing results in child results.
         if node.fields:
-            result = ctx.execute(request, node, results)
+            result = path.execute(request, node, results)
             if result is None:
                 result = {}  # to avoid doing results.update(None)
-            if ctx.schema is not None:
-                result, errors = ctx.schema.load(result)
             if isinstance(result, dict):
+                if schema is not None:
+                    # calling schema.load translates the keys in the raw dict
+                    # returned by node.execute into what the client expects.
+                    result, errors = schema.load(result)  # TODO: log errors
                 results.update(result)
-            else:
-                # i.e. result is most likely a list.
+            elif isinstance(result, (list, tuple, set)):
+                if schema is not None:
+                    result = [x.data for x in schema.load(result)]
                 return result
+            else:
+                raise Exception('illegal path result type')
 
         return results
 
@@ -123,27 +148,27 @@ class Node(object):
         return None
 
     @classmethod
-    def _build_node(cls, ast_ctx, parent=None):
+    def _build_node(cls, ast_path, parent=None):
         """
-        Process a graphql-core AST ctx while parsing.
+        Process a graphql-core AST path while parsing.
         """
         node = cls(parent=parent)
 
-        if ast_ctx.name:
-            node.name = ast_ctx.name.value
+        if ast_path.name:
+            node.name = ast_path.name.value
 
-        # TODO: Check type of ast_ctx instead. i.e. is selectionset
-        if hasattr(ast_ctx, 'alias') and ast_ctx.alias is not None:
-            node.alias = ast_ctx.alias.value
+        # TODO: Check type of ast_path instead. i.e. is selectionset
+        if hasattr(ast_path, 'alias') and ast_path.alias is not None:
+            node.alias = ast_path.alias.value
 
         node.args = {}
-        if hasattr(ast_ctx, 'arguments'):
+        if hasattr(ast_path, 'arguments'):
             node.args = {
-                arg.name.value: arg.value.value for arg in ast_ctx.arguments
+                arg.name.value: arg.value.value for arg in ast_path.arguments
             }
         node.children = {}
-        if ast_ctx.selection_set:
-            for child in ast_ctx.selection_set.selections:
+        if ast_path.selection_set:
+            for child in ast_path.selection_set.selections:
                 # store children under alias if alias exists,
                 # use the otherwise typename.
                 if hasattr(child, 'alias') and child.alias is not None:

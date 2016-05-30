@@ -1,12 +1,15 @@
 from pprint import pprint
 
+from mock import MagicMock
+
 from pygql.examples import graph
+from pygql.examples import basic
 
 
 if __name__ == '__main__':
-    from pygql.examples import basic
 
-    request = None  # this is a mock request
+    request = MagicMock()
+    request.session.user.public_id = 'ABC123'
 
     # build a registry of graph traversals or "paths"
     # defined in the given module or package.
@@ -18,13 +21,12 @@ if __name__ == '__main__':
             company(id: "123") {
                 type, name
             },
-            jim: user(id: "123") {
+            jim: user(id: "ABC123") {
                 location {city, state}, first_name, id
             },
-            bob: user(id: "123") {
-                loc: location {city, state}, first_name,
+            bob: user(id: "LSD123") {
+                first_name, last_name
             }
         }''')
 
     pprint(results, indent=2)
-    pprint(graph.contexts)

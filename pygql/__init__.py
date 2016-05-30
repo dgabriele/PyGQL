@@ -1,12 +1,12 @@
 from .graph import Graph
 from .node import Node
-from .validation import Schema
-from .authorization import Authorization
+from .schema import Schema
+from .context import Context
 
 
 __all__ = [
     'Graph',
     'Node',
     'Schema',
-    'Authorization',
+    'Context',
 ]

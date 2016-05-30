@@ -22,15 +22,15 @@ class PyGQL_Exception(Exception):
 class FieldValidationError(PyGQL_Exception):
     code = 2
     default_payload = {
-        'message': 'You tried to query unrecognized fields'
+        'message': 'Unauthorized or unknown fields'
     }
 
-    def __init__(self, query, field_names):
+    def __init__(self, node, field_names):
         super(FieldValidationError, self).__init__({
             'data': {
                 'fields': list(field_names),
-                'name': query.name,
-                'alias': query.alias
+                'name': node.name,
+                'alias': node.alias
             }
         })
 
@@ -38,7 +38,7 @@ class FieldValidationError(PyGQL_Exception):
 class InvalidOperation(PyGQL_Exception):
     code = 3
     default_payload = {
-        'message': 'Invalid GraphQL query operation'
+        'message': 'Invalid GraphQL node operation'
     }
 
     def __init__(self, op_name):
@@ -51,13 +51,29 @@ class InvalidOperation(PyGQL_Exception):
 class AuthorizationError(PyGQL_Exception):
     code = 4
     default_payload = {
-        'message': 'not authorized'
+        'message': 'Not authorized'
     }
 
     def __init__(self, message=None):
         super(AuthorizationError, self).__init__({
             'message': message if message else 'not authorized',
             'data': {
-                # TODO: include query information
+                # TODO: include node information
+            }
+        })
+
+
+class AmbiguousFieldError(PyGQL_Exception):
+    code = 2
+    default_payload = {
+        'message': 'Ambiguous name or alias'
+    }
+
+    def __init__(self, node, field_name):
+        super(FieldValidationError, self).__init__({
+            'data': {
+                'field': field_name,
+                'name': node.name,
+                'alias': node.alias
             }
         })

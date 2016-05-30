@@ -1,12 +1,13 @@
 import marshmallow as mm
 
-from pygql.validation import Schema
-from pygql.authorization import Authorization
-from pygql.exceptions import AuthorizationError
+from pygql import Schema
+from pygql import Context
 
 from . import graph
 
-# example validation schemas
+#
+# example schemas
+#
 
 class LocationSchema(Schema):
     """ Defines the valid fields for a location query.
@@ -16,27 +17,39 @@ class LocationSchema(Schema):
     country = mm.fields.Str()
 
 
-class UserSchema(Schema):
+class UserSchemaFriend(Schema):
     """ Defines the valid fields for a user query.
     """
     id = mm.fields.Str(load_from='public_id')
     first_name = mm.fields.Str()
     last_name = mm.fields.Str()
-    email = mm.fields.Str()
+
+
+class UserSchemaOwner(UserSchemaFriend):
+    """ Defines the valid fields for a user query.
+    """
     location = mm.fields.Nested(LocationSchema)
+    email = mm.fields.Str()
 
 
-# example authorization
+#
+# path context definitions
+#
 
-class UserAuthorization(Authorization):
-    def __call__(self, request, node):
-        if 'email' in node.fields:
-            raise AuthorizationError()
+class UserContext(Context):
+    def __init__(self, request, node):
+        self.user_public_id = node.args.get('id')
 
+    def authorize(self, request, node):
+        if self.user_public_id == request.session.user.public_id:
+            return UserSchemaOwner()
+        return UserSchemaFriend()
 
+#
 # path registration
+#
 
-@graph(paths=['user'], schema=UserSchema, authorize=UserAuthorization)
+@graph(path='user', context=UserContext)
 def user(request, node, children):
     row = {
         'public_id': 'ABC123',
@@ -44,20 +57,20 @@ def user(request, node, children):
         'last_name': 'Bar',
         'email': 'foo@bar.baz'
     }
-    return select(row, node.fields)
+    return projection(row, node.fields)
 
 
 @graph(paths=['company'])
 def company(request, node, children):
     row = {'type': 'LLC', 'name': 'Generic Company'}
-    return select(row, node.fields)
+    return projection(row, node.fields)
 
 
 @graph(paths=['user.location'])
 def user_location(request, node, children):
     row = {'city': 'New York', 'state': 'NY', 'country':'USA'}
-    return select(row, node.fields)
+    return projection(row, node.fields)
 
 
-def select(row, cols):
+def projection(row, cols):
     return {k: row[k] for k in cols if k in row}

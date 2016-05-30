@@ -34,17 +34,23 @@ class Schema(marshmallow.Schema):
         return valid_child_names
 
     def resolve_scalar_field_names(self, field_names):
-        computed_field_names = []
+        scalar_field_names = []
+        unrecognized_field_names = []
         for k in field_names:
             v = self.scalar_fields.get(k)
             if v is not None:
-                computed_field_names.append(v.load_from or k)
-        return computed_field_names
+                scalar_field_names.append(v.load_from or k)
+            else:
+                unrecognized_field_names.append(k)
+        return (scalar_field_names, unrecognized_field_names)
 
     def resolve_nested_field_names(self, field_names):
-        computed_field_names = []
+        nested_field_names = []
+        unrecognized_field_names = []
         for k in field_names:
             v = self.nested_fields.get(k)
             if v is not None:
-                computed_field_names.append(v.load_from or k)
-        return computed_field_names
+                nested_field_names.append(v.load_from or k)
+            else:
+                unrecognized_field_names.append(k)
+        return (nested_field_names, unrecognized_field_names)
