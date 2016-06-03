@@ -49,7 +49,7 @@ class UserContext(Context):
 # path registration
 #
 
-@graph(path='user', context=UserContext, yield_state=True)
+@graph(path='user', context=UserContext, yields=True)
 def user(request, node):
     yield {
         'country': 'Afghanistan'
@@ -59,7 +59,7 @@ def user(request, node):
     if 'location' in node:
         city = node['location'].result.get('city', city)
 
-    return projection({
+    yield projection({
         'public_id': 'ABC123',
         'first_name': 'Daniel von {}'.format(city),
         'last_name': 'Gabriele',
@@ -67,7 +67,7 @@ def user(request, node):
     }, node.fields)
 
 
-@graph(paths=['company'])
+@graph(path=['company'])
 def company(request, node):
     return projection({
         'type': 'LLC',
@@ -75,7 +75,7 @@ def company(request, node):
     }, node.fields)
 
 
-@graph(paths=['user.location'])
+@graph(path=['user.location'])
 def user_location(request, node):
     return projection({
         'city': 'New York',

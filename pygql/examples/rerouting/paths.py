@@ -19,7 +19,7 @@ def user(request, node):
 def project_assignee(request, node):
     project_id = node.parent.args['id']
     node.args['id'] = query_assignee_id(project_id)
-    raise Reroute(node, 'user')
+    node.reroute('user')
 
 
 def query_assignee_id(project_id):

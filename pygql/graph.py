@@ -22,20 +22,22 @@ def Graph():
         root = Path()
 
         def __init__(self,
-                     path:str=None,
-                     paths:list=None,
+                     path:object=None,
                      context:Context=None,
-                     yield_state:bool=False,
-                     ):
+                     yields:bool=False):
             """
             Args:
-                - `path`: a dotted path string
-                - `paths`: list of dotted path strings
+                - `path`: a dotted path string or list of strings
                 - `context`: subclass of pygql.Context
+                - `yields`: indicates that the wrapped function is a generator
+                            which yields state to its child functions.
             """
-            dotted_paths = set(paths or [])
-            if path is not None:
+            dotted_paths = set()
+            if isinstance(path, str):
                 dotted_paths.add(path)
+            elif isinstance(path, (list, tuple, set)):
+                for dotted_path in path:
+                    dotted_paths.add(dotted_path)
 
             assert dotted_paths
             assert (context is None) or issubclass(context, Context)
@@ -50,7 +52,7 @@ def Graph():
                 path.root = self.root
                 path.name = dotted_path
                 path.context_class = context
-                path.yield_state = yield_state
+                path.yields = yields
                 self._paths.append(path)
 
         def __call__(self, func):

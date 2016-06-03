@@ -11,7 +11,7 @@ class Path(object):
     `children` dict. The keys in this dict are the names or aliases of the
     corresponding child Paths.
     """
-    def __init__(self, name:str=None, yield_state:bool=False):
+    def __init__(self, name:str=None, yields:bool=False):
         """
             - `self.execute`: callback function registered with the path
             - `self.authorize`: instance of authorization.Authorization
@@ -24,7 +24,7 @@ class Path(object):
         self.context_class = None
         self.children = defaultdict(Path)
         self.name = name or ''
-        self.yield_state = yield_state
+        self.yields = yields
 
     def __getitem__(self, key:str):
         return self.traverse(key)

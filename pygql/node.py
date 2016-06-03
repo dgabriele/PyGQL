@@ -40,7 +40,7 @@ class Node(object):
         # Arguments passed to the GraphQL node
         self.args = args or {}
 
-        # Yielded state (see the @graph yield_state param docs)
+        # Yielded state (see the @graph yields param docs)
         self.state = state or {}
 
         # User-defined object that implements the Context interface
@@ -132,7 +132,7 @@ class Node(object):
                 node.validate(schema)
 
         # yield this state for consumption by its child nodes
-        if path.yield_state:
+        if path.yields:
             state_generator = path.execute(request, node)
             node.state = state_generator.send(None)
         else:
@@ -147,10 +147,7 @@ class Node(object):
         if node.fields:
             try:
                 if state_generator is not None:
-                    try:
-                        state_generator.send(None)
-                    except StopIteration as exc:
-                        node.result = exc.value
+                    node.result = state_generator.send(None)
                 else:
                     node.result = path.execute(request, node)
             except Reroute as route:
