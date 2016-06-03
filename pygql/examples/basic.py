@@ -49,27 +49,39 @@ class UserContext(Context):
 # path registration
 #
 
-@graph(path='user', context=UserContext)
-def user(request, node, children):
-    row = {
-        'public_id': 'ABC123',
-        'first_name': 'Foo',
-        'last_name': 'Bar',
-        'email': 'foo@bar.baz'
+@graph(path='user', context=UserContext, yield_state=True)
+def user(request, node):
+    yield {
+        'country': 'Afghanistan'
     }
-    return projection(row, node.fields)
+
+    city = 'Orlando'
+    if 'location' in node:
+        city = node['location'].result.get('city', city)
+
+    return projection({
+        'public_id': 'ABC123',
+        'first_name': 'Daniel von {}'.format(city),
+        'last_name': 'Gabriele',
+        'email': 'foo@bar.baz'
+    }, node.fields)
 
 
 @graph(paths=['company'])
-def company(request, node, children):
-    row = {'type': 'LLC', 'name': 'Generic Company'}
-    return projection(row, node.fields)
+def company(request, node):
+    return projection({
+        'type': 'LLC',
+        'name': 'Generic Company'
+    }, node.fields)
 
 
 @graph(paths=['user.location'])
-def user_location(request, node, children):
-    row = {'city': 'New York', 'state': 'NY', 'country':'USA'}
-    return projection(row, node.fields)
+def user_location(request, node):
+    return projection({
+        'city': 'New York',
+        'state': 'NY',
+        'country': node.parent.state.get('country', 'USA'),
+    }, node.fields)
 
 
 def projection(row, cols):

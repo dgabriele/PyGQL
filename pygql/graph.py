@@ -24,7 +24,12 @@ def Graph():
         # a tree. It is the entry point to every defined path in the graph.
         root = Path()
 
-        def __init__(self, path=None, paths=None, context=None):
+        def __init__(self,
+                     path=None,
+                     paths=None,
+                     context=None,
+                     yield_state=False,
+                     ):
             """
             Args:
                 - `paths`: a dotted path strings
@@ -47,6 +52,7 @@ def Graph():
                 path = self.root.traverse(dotted_path.split('.'))
                 path.name = dotted_path
                 path.context_class = context
+                path.yield_state = yield_state
                 self._paths.append(path)
 
         def __call__(self, func):
@@ -89,7 +95,7 @@ class Path(object):
     `children` dict. The keys in this dict are the names or aliases of the
     corresponding child Paths.
     """
-    def __init__(self, name=None):
+    def __init__(self, name=None, yield_state=False):
         """
             - `self.execute`: callback function registered with the path
             - `self.authorize`: instance of authorization.Authorization
@@ -101,6 +107,7 @@ class Path(object):
         self.context_class = None
         self.children = defaultdict(Path)
         self.name = name or ''
+        self.yield_state = yield_state
 
     def __getitem__(self, key):
         return self.traverse(key)
