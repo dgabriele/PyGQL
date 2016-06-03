@@ -11,12 +11,13 @@ from pygql.exceptions import (
 
 from pygql.schema import Schema
 from pygql.context import Context
+from pygql.path import Path
 
 
 class Node(object):
     def __init__(self,
-                 root:object,
-                 parent:object=None,
+                 root,
+                 parent=None,
                  alias:str=None,
                  name:str=None,
                  args:dict=None,
@@ -48,23 +49,23 @@ class Node(object):
         # the "return value" of the node's execution function
         self.result = None
 
-    def __getitem__(self, key):
+    def __getitem__(self, key:str):
         return self.children.get(key)
 
-    def __contains__(self, child_name):
+    def __contains__(self, child_name:str):
         return child_name in self.children
 
-    def reroute(self, dotted_path):
-        raise Reroute(self, dotted_path)
+    def reroute(self, location:str):
+        raise Reroute(self, location)
 
     # TODO: merge this logic to reduce number of times the field names
     # are iterated through.
-    def validate(self, schema):
+    def validate(self, schema:Schema):
         assert isinstance(schema, Schema)
         self._validate_fields(schema)
         self._validate_children(schema)
 
-    def _validate_fields(self, schema):
+    def _validate_fields(self, schema:Schema):
         """ detect unrecognized field names. replace requested fields list with
             fields that are understood by the path execution function
         """
@@ -75,7 +76,7 @@ class Node(object):
         self.fields = valid_names
 
 
-    def _validate_children(self, schema):
+    def _validate_children(self, schema:Schema):
         """ detect unrecognized child names
         """
         # we use child path `name` attributes instead of the keys in
@@ -87,7 +88,7 @@ class Node(object):
             raise FieldValidationError(self, unrec_names)
         self._raise_for_duplicate_fields(valid_names)
 
-    def _raise_for_duplicate_fields(self, field_names):
+    def _raise_for_duplicate_fields(self, field_names:list):
         counter = Counter()
         duplicate_names = []
         for k in field_names:
@@ -102,7 +103,7 @@ class Node(object):
         return not self.children
 
     @classmethod
-    def execute(cls, request, query, graph):
+    def execute(cls, request, query:str, graph):
         """ Execute a GraphQL node.
 
             Args:
@@ -115,7 +116,7 @@ class Node(object):
         return cls._execute(request, cls.parse(query), path=graph.root)
 
     @classmethod
-    def _execute(cls, request, node, path):
+    def _execute(cls, request, node, path:Path):
         """
         Recursively execute a Node.
         """
@@ -227,6 +228,6 @@ class Node(object):
 
 
 class Reroute(Exception):
-    def __init__(self, node:object, location:str):
+    def __init__(self, node, location:str):
         self.node = node
         self.location = location
