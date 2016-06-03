@@ -50,6 +50,7 @@ def Graph():
             self._paths = []
             for dotted_path in dotted_paths:
                 path = self.root.traverse(dotted_path.split('.'))
+                path.root = self.root
                 path.name = dotted_path
                 path.context_class = context
                 path.yield_state = yield_state
@@ -103,6 +104,7 @@ class Path(object):
             - `self.children`: child paths do not include queried fields
             - `self.name`: dotted path to this path
         """
+        self.root = None
         self.execute = None
         self.context_class = None
         self.children = defaultdict(Path)

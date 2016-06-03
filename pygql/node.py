@@ -54,6 +54,9 @@ class Node(object):
     def __contains__(self, child_name):
         return child_name in self.children
 
+    def reroute(self, dotted_path):
+        raise Reroute(self, dotted_path)
+
     # TODO: merge this logic to reduce number of times the field names
     # are iterated through.
     def validate(self, schema):
@@ -141,13 +144,17 @@ class Node(object):
 
         # Execute at node-level, passing results in child results.
         if node.fields:
-            if state_generator is not None:
-                try:
-                    state_generator.send(None)
-                except StopIteration as exc:
-                    node.result = exc.value
-            else:
-                node.result = path.execute(request, node)
+            try:
+                if state_generator is not None:
+                    try:
+                        state_generator.send(None)
+                    except StopIteration as exc:
+                        node.result = exc.value
+                else:
+                    node.result = path.execute(request, node)
+            except Reroute as route:
+                root = path.root[route.location]
+                node.result = cls._execute(request, route.node, root)
             if node.result is None:
                 node.result = {}  # to avoid doing results.update(None)
             if isinstance(node.result, dict):
@@ -217,3 +224,9 @@ class Node(object):
                     node.fields.append(key)
 
         return node
+
+
+class Reroute(Exception):
+    def __init__(self, node:object, location:str):
+        self.node = node
+        self.location = location
