@@ -69,7 +69,7 @@ class Node(object):
         """ detect unrecognized field names. replace requested fields list with
             fields that are understood by the path execution function
         """
-        valid_names, unrec_names = schema.resolve_scalar_field_names(self.fields)
+        valid_names, unrec_names = schema.translate(self.fields)
         if unrec_names:
             raise FieldValidationError(self, unrec_names)
         self._raise_for_duplicate_fields(valid_names)
@@ -83,7 +83,7 @@ class Node(object):
         # `children` because the keys are a mixture of valid field names
         # as well as field aliases; whereas path.name is always the field name.
         names = set(v.name for v in self.children.values())
-        valid_names, unrec_names = schema.resolve_nested_field_names(names)
+        valid_names, unrec_names = schema.translate(names, nested=True)
         if unrec_names:
             raise FieldValidationError(self, unrec_names)
         self._raise_for_duplicate_fields(valid_names)
@@ -157,15 +157,12 @@ class Node(object):
                 node.result = {}  # to avoid doing results.update(None)
             if isinstance(node.result, dict):
                 if schema is not None:
-                    # calling schema.load translates the keys in the raw dict
-                    # returned by node.execute into what the client expects.
-                    node.result, errors = schema.load(node.result)
-                    # TODO: log errors
+                    node.result = schema.dump(node.result)
                 results.update(node.result)
                 return results
             elif isinstance(node.result, (list, tuple, set)):
                 if schema is not None:
-                    node.result = [schema.load(x).data for x in node.result]
+                    node.result = [schema.dump(x) for x in node.result]
                 return node.result
             else:
                 raise Exception('illegal path result type')

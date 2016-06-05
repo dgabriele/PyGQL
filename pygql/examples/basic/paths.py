@@ -1,6 +1,4 @@
-import marshmallow as mm
-
-from pygql import Schema
+from pygql import Schema, Field
 from pygql import Context
 
 from . import graph
@@ -9,28 +7,17 @@ from . import graph
 # example schemas
 #
 
+class UserSchema(Schema):
+    id = Field('public_id')
+    first_name = Field('first_name')
+    last_name = Field('last_name')
+    email = Field('email')
+    location = Field('location', nested=True)
+
 class LocationSchema(Schema):
-    """ Defines the valid fields for a location query.
-    """
-    city = mm.fields.Str()
-    state = mm.fields.Str()
-    country = mm.fields.Str()
-
-
-class UserSchemaFriend(Schema):
-    """ Defines the valid fields for a user query.
-    """
-    id = mm.fields.Str(load_from='public_id')
-    first_name = mm.fields.Str()
-    last_name = mm.fields.Str()
-
-
-class UserSchemaOwner(UserSchemaFriend):
-    """ Defines the valid fields for a user query.
-    """
-    location = mm.fields.Nested(LocationSchema)
-    email = mm.fields.Str()
-
+    city = Field('city')
+    state = Field('state')
+    country = Field('country')
 
 #
 # path context definitions
@@ -39,11 +26,10 @@ class UserSchemaOwner(UserSchemaFriend):
 class UserContext(Context):
     def __init__(self, request, node):
         self.user_public_id = node.args.get('id')
+        self.schema = UserSchema()
 
     def authorize(self, request, node):
-        if self.user_public_id == request.session.user.public_id:
-            return UserSchemaOwner()
-        return UserSchemaFriend()
+        return self.schema
 
 #
 # path registration

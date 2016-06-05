@@ -84,46 +84,7 @@ print(results)
 All PyGQL exceptions use a JSON serialized message. See `exceptions.py`.
 
 ## Request Validation
-One thing you might want to do is ensure that the fields queried come from an allowed set. PyGQL uses the `marshmallow` validation library to do this.
-
-```python
-from pygql import Schema
-from marshmallow import fields
-
-class UserSchema(Schema):
-    first_name = fields.Str()
-    last_name = fields.Str()
-    location = fields.Nested('LocationSchema')
-
-class LocationSchema(Schema):
-    city = fields.Str()
-    state = fields.Str()
-    country = fields.Str()
-
-@graph(paths=['user'], schema=UserSchema)  # Note the `schema` param
-def user(request, node, children):
-    """ Return user projection.
-    """
-```
-
-A `FieldValidationError` is raised when a requested field does not match a field defined in the schema.
+TODO
 
 ## Authorization
-Currently, arbitrary authorization logic can be assigned to each node in the graph. This is done by setting the `authorize` parameter of the `@graph` decorator. This parameter must be an `Authorization` subclass and raise an `AuthorizationError` when appropriate. For example:
-
-```python
-from pygql.authorization import Authorization
-from pygql.exceptions import AuthorizationError
-
-class CompanyAuthorization(Authorization):
-  """ Authorize request and query to the given node.
-  """
-  def __call__(self, request, node):
-    if 'password' in node.fields:
-      raise AuthorizationError()
-
-@graph(paths=['user'], authorize=CompanyAuthorization)  # Note the `authorize` param
-def company(request, node, children):
-    """ Return company projection.
-    """
-```
+TODO

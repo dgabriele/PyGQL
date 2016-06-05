@@ -1,56 +1,82 @@
-import marshmallow
-
-from memoized_property import memoized_property
-
-from pygql.exceptions import FieldValidationError
+from collections import defaultdict
 
 
-class Schema(marshmallow.Schema):
+__all__ = ['Field', 'Schema']
 
-    @memoized_property
-    def scalar_fields(self):
-        return {k: v for k, v in self.fields.items()
-        if not isinstance(v, marshmallow.fields.Nested)
-    }
 
-    @memoized_property
-    def nested_fields(self):
-        return {k: v for k, v in self.fields.items()
-        if isinstance(v, marshmallow.fields.Nested)
-    }
+class Field(object):
+    def __init__(self, name:str=None, nested=False, authorized_field_maps:list=None):
+        self.name = name
+        self.nested = nested
+        self.authorized_field_maps = authorized_field_maps or []
 
-    @memoized_property
-    def scalar_field_names(self):
-        valid_field_names = set()
-        for k, v in self.scalar_fields.items():
-            valid_field_names.add(v.load_from or k)
-        return valid_field_names
 
-    @memoized_property
-    def nested_field_names(self):
-        valid_child_names = set()
-        for k, v in self.nested_fields.items():
-            valid_child_names.add(v.load_from or k)
-        return valid_child_names
+class Schema(object):
+    def __init__(self):
+        # inverse mapping from internal field names to public names
+        self.inverse = {}
 
-    def resolve_scalar_field_names(self, field_names):
-        scalar_field_names = []
-        unrecognized_field_names = []
-        for k in field_names:
-            v = self.scalar_fields.get(k)
-            if v is not None:
-                scalar_field_names.append(v.load_from or k)
+        # collections of data structures for fields corresponding to
+        # scalar properties of the schema
+        self.scalar = SchemaFields()
+
+        # same as above but for nested fields, i.e. relationships
+        self.nested = SchemaFields()
+
+        # initialize self.scalar and self.nested
+        for k, v in self.__class__.__dict__.items():
+            if (not k.startswith('__')) and isinstance(v, Field):
+                if v.name is None:
+                    v.name = k
+                self.inverse[v.name] = k
+                fields = self.nested if v.nested else self.scalar
+                fields.keys.add(k)
+                if v.authorized_field_maps:
+                    for role in v.authorized_field_maps:
+                        fields.authorized_field_maps[role][k] = v.name
+                else:
+                    fields.public_field_map[k] = v.name
+
+        # add public field maps to all authorized field maps
+        if self.scalar.public_field_map:
+            for role, field_map in self.scalar.authorized_field_maps.items():
+                field_map.update(self.scalar.public_field_map)
+        if self.nested.public_field_map:
+            for role, field_map in self.nested.authorized_field_maps.items():
+                field_map.update(self.nested.public_field_map)
+
+    def __contains__(self, key):
+        return (key in self.scalar.keys) or (key in self.nested.keys)
+
+    def translate(self, keys:list, nested=False, role:str=None):
+        valid = []
+        unrecognized = []
+        fields = self.nested if nested else self.scalar
+        if role is not None:
+            field_map = fields.authorized_field_maps[role]
+        else:
+            field_map = fields.public_field_map
+        for k_in in keys:
+            k_out = field_map.get(k_in)
+            if k_out is not None:
+                valid.append(k_out)
             else:
-                unrecognized_field_names.append(k)
-        return (scalar_field_names, unrecognized_field_names)
+                unrecognized.append(k_in)
+        return (valid, unrecognized)
 
-    def resolve_nested_field_names(self, field_names):
-        nested_field_names = []
-        unrecognized_field_names = []
-        for k in field_names:
-            v = self.nested_fields.get(k)
-            if v is not None:
-                nested_field_names.append(v.load_from or k)
-            else:
-                unrecognized_field_names.append(k)
-        return (nested_field_names, unrecognized_field_names)
+    def dump(self, obj:dict):
+        return {
+            self.inverse[k]: v for k, v in obj.items()
+        }
+
+
+class SchemaFields(object):
+    def __init__(self):
+        # map from role to field map
+        self.authorized_field_maps = defaultdict(dict)
+
+        # field map for fields with no assigned roles
+        self.public_field_map = {}
+
+        # all field names regardless of role
+        self.keys = set()
