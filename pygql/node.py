@@ -5,6 +5,7 @@ from graphql.language.source import Source
 
 from pygql.exceptions import (
     InvalidOperation,
+    InvalidResult,
     FieldValidationError,
     AmbiguousFieldError,
 )
@@ -14,40 +15,56 @@ from pygql.context import Context
 from pygql.path import Path
 
 
+__all__ = ['Node']
+
+
+class RerouteException(Exception):
+    def __init__(self, node, location:str):
+        self.node = node
+        self.location = location
+
+
 class Node(object):
-    def __init__(self,
-                 root,
-                 parent=None,
-                 alias:str=None,
-                 name:str=None,
-                 args:dict=None,
-                 fields:list=None,
-                 children:list=None,
-                 state:dict=None,
-                 context:Context=None):
+    def __init__(self, root, parent=None):
+        self.root = root        # absolute root node
+        self.parent = parent    # The parent node
 
-        self.root = root
-        self.parent = parent  # The parent node
-        self.alias = alias    # GraphQL node alias
-        self.name = name      # Unaliased name of the node
+        # Unaliased name of the GraphQL node
+        self.name = None
 
-        # Child nodes
-        self.children = children or {}
+        # GraphQL node alias
+        self.alias = None
 
-        # Scalar properties queried at this node
-        self.fields = fields or []
+        # Child nodes, representing nested objects/relationships
+        self.children = {}
+
+        # The data elements queried at this node
+        self.fields = []
 
         # Arguments passed to the GraphQL node
-        self.args = args or {}
+        self.args = {}
 
         # Yielded state (see the @graph yields param docs)
-        self.state = state or {}
+        self.state = {}
 
-        # User-defined object that implements the Context interface
+        # User-defined object that implements the Context interface,
+        # performs authorization.
         self.context = None
 
-        # the "return value" of the node's execution function
-        self.result = None
+        # The "return value" of the node's execution function,
+        # merged into the parent node, if exists.
+        self.result = {}
+
+        # State generator. state can be passed down to child nodes.
+        # this is set by nodes that have a corresponding Path with
+        # yields == True.
+        self._generator = None
+
+        # Flag that indicates that the generator was instantiated
+        self._has_state = False
+
+        # Schema instance returned by Context.authorize method
+        self._schema = None
 
     def __getitem__(self, key:str):
         return self.children.get(key)
@@ -56,7 +73,7 @@ class Node(object):
         return child_name in self.children
 
     def reroute(self, location:str):
-        raise Reroute(self, location)
+        raise RerouteException(self, location)
 
     # TODO: merge this logic to reduce number of times the field names
     # are iterated through.
@@ -103,85 +120,129 @@ class Node(object):
         return not self.children
 
     @classmethod
-    def execute(cls, request, query:str, graph):
+    def execute(cls, request, query, graph):
         """ Execute a GraphQL node.
 
             Args:
-                - request: an HTTP Request object from your web framework
-                - query: A GraphQL query string
-                - graph: An instance of `pygql.graph.Context`. This is distinct
-                  from user-provided context classes set as @graph params. This
-                  is context from the POV of GraphQL query execution.
+                - request: HTTP Request object from your web framework
+                - query: GraphQL query string
+                - graph: `pygql.graph.Graph` class reference
         """
-        return cls._execute(request, cls.parse(query), path=graph.root)
+        root_label = None
+        root_node = cls.parse(query)
+        root_path = graph.root
+
+        # Enqueue the nodes inte query in depth-first order
+        queue = cls._enqueue_nodes(root_label, root_node, root_path)
+
+        for label, node, path in queue:
+            # Generate node.state for consumption by child nodes
+            if path.yields and (not node._has_state):
+                cls._generate_state(request, node, path)
+                continue
+
+            # Instantiate the node's context and validate fields and child
+            # nodes against the Schema instance returned by Context.authorize
+            if path.context_class is not None:
+                cls._build_context_and_validate(request, node, path)
+
+            # If node.fields is None, we don't execute the node because this
+            # means that there isn't any data to fetch, and child nodes have
+            # already executed in our depth-first traversal.
+            if node.fields:
+                result = cls._execute_node(request, node, path)
+                cls._process_result(result, label, node, path)
+
+        return root_node.result
 
     @classmethod
-    def _execute(cls, request, node, path:Path):
-        """
-        Recursively execute a Node.
-        """
-        results = {}
-
-        # Authorize the request to the node. If success, validate the queried
-        # field and child node names against a return Schema object.
-        schema = None
-        if path.context_class is not None:
-            node.context = path.context_class(request, node)
-            schema = node.context.authorize(request, node)
-            if schema is not None:
-                node.validate(schema)
-
-        # yield this state for consumption by its child nodes
-        if path.yields:
-            state_generator = path.execute(request, node)
-            node.state = state_generator.send(None)
+    def _process_result(cls, result, label, node, path):
+        if isinstance(result, dict):
+            # We merge the node.result, which at this point already
+            # contains items generated by its child nodes.
+            if node._schema is not None:
+                result = node._schema.dump(result)
+            node.result.update(result)
+        elif isinstance(result, (list, tuple, set)):
+            # Nodes that return lists are responsible for converting
+            # the results set by children, which should also be lists,
+            # into a single merged array of dicts.
+            if node._schema is not None:
+                result = [node._schema.dump(x) for x in result]
+            node.result = result
         else:
-            state_generator = None
+            raise InvalidResult(path.name, result)
 
-        # Execute child nodes in depth-first traversal in order to pass the
-        # results back up to the parent (i.e. `node`).
-        for k, v in node.children.items():
-            results[k] = cls._execute(request, v, path.children[v.name])
+        # insert child results into parent node result
+        if node.parent is not None:
+            node.parent.result[label] = node.result
 
-        # Execute at node-level, passing results in child results.
-        if node.fields:
+    @classmethod
+    def _enqueue_nodes(cls, label, node, path, queue=None):
+        if queue is None:
+            queue = []  # base case
+
+        # If the node has state (i.e. "yields"), it means that node.execute
+        # is a generator function; therefore, we must invoke the generator once
+        # before any child nodes execute to ensure that parent state is
+        # available to them. We will invoke the generator for a second and
+        # final time in the usual depth-first order (i.e. after child nodes).
+        if path.yields:
+            queue.append((label, node, path))
+
+        # enqueue children
+        for child_label, child_node in node.children.items():
+            child_path = path[child_node.name]
+            cls._enqueue_nodes(child_label, child_node, child_path, queue)
+
+        queue.append((label, node, path))
+        return queue
+
+    @classmethod
+    def _generate_state(cls, request, node, path):
+        node._generator = path.execute(request, node)
+        node.state = node._generator.send(None)
+        node._has_state = True
+
+    @classmethod
+    def _build_context_and_validate(cls, request, node, path):
+        node.context = path.context_class(request, node)
+        node._schema = node.context.authorize(request, node)
+        if node._schema is not None:
+            node.validate(node._schema)
+
+    @classmethod
+    def _execute_node(cls, request, node, path):
+        while True:
+            # This loop is to retry node execution in case
+            # a RerouteException is raised.
             try:
-                if state_generator is not None:
-                    node.result = state_generator.send(None)
+                if not node._has_state:
+                    result = path.execute(request, node)
                 else:
-                    node.result = path.execute(request, node)
-            except Reroute as route:
-                root = path.root[route.location]
-                node.result = cls._execute(request, route.node, root)
-            if node.result is None:
-                node.result = {}  # to avoid doing results.update(None)
-            if isinstance(node.result, dict):
-                if schema is not None:
-                    node.result = schema.dump(node.result)
-                results.update(node.result)
-                return results
-            elif isinstance(node.result, (list, tuple, set)):
-                if schema is not None:
-                    node.result = [schema.dump(x) for x in node.result]
-                return node.result
-            else:
-                raise Exception('illegal path result type')
+                    # this is for paths that "yield"
+                    result = node._generator.send(None)
+                    node._has_state = False
+                break
+            except RerouteException as exc:
+                # replace current path with new path
+                path = path.root[exc.location]
+                if path.yields:
+                    cls._generate_state(request, node, path)
 
-        return results
+        return result or {}
 
     @classmethod
     def parse(cls, node):
         """ Parse graphql-code AST into a Context tree.
         """
         doc_ast = parse(Source(node))
-
         if doc_ast.definitions:
             op_def = doc_ast.definitions[0]
             if op_def.operation != 'query':
                 raise InvalidOperation(op_def.name.value)
             root = cls._build_node(op_def)
             return root
-
         return None
 
     @classmethod
@@ -219,9 +280,3 @@ class Node(object):
                     node.fields.append(key)
 
         return node
-
-
-class Reroute(Exception):
-    def __init__(self, node, location:str):
-        self.node = node
-        self.location = location

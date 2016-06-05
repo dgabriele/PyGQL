@@ -38,7 +38,7 @@ class FieldValidationError(PyGQL_Exception):
 class InvalidOperation(PyGQL_Exception):
     code = 3
     default_payload = {
-        'message': 'Invalid GraphQL node operation'
+        'message': 'invalid GraphQL node operation'
     }
 
     def __init__(self, op_name):
@@ -48,25 +48,11 @@ class InvalidOperation(PyGQL_Exception):
             }
         })
 
-class AuthorizationError(PyGQL_Exception):
-    code = 4
-    default_payload = {
-        'message': 'Not authorized'
-    }
-
-    def __init__(self, message=None):
-        super(AuthorizationError, self).__init__({
-            'message': message if message else 'not authorized',
-            'data': {
-                # TODO: include node information
-            }
-        })
-
 
 class AmbiguousFieldError(PyGQL_Exception):
-    code = 2
+    code = 3
     default_payload = {
-        'message': 'Ambiguous name or alias'
+        'message': 'ambiguous name or alias'
     }
 
     def __init__(self, node, field_name):
@@ -75,5 +61,21 @@ class AmbiguousFieldError(PyGQL_Exception):
                 'field': field_name,
                 'name': node.name,
                 'alias': node.alias
+            }
+        })
+
+
+class InvalidResult(PyGQL_Exception):
+    code = 4
+    default_payload = {
+        'message': 'unsupported return value data type; '
+                   'expecting dict or iterable'
+    }
+
+    def __init__(self, path:str, result):
+        super(InvalidResult, self).__init__({
+            'data': {
+                'path': path,
+                'type': type(result).__name__
             }
         })

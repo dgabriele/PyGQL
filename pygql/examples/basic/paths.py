@@ -31,6 +31,13 @@ class UserContext(Context):
     def authorize(self, request, node):
         return self.schema
 
+class LocationContext(Context):
+    def __init__(self, request, node):
+        self.schema = LocationSchema()
+
+    def authorize(self, request, node):
+        return self.schema
+
 #
 # path registration
 #
@@ -61,7 +68,7 @@ def company(request, node):
     }, node.fields)
 
 
-@graph(path=['user.location'])
+@graph(path='user.location', context=LocationContext)
 def user_location(request, node):
     return projection({
         'city': 'New York',
