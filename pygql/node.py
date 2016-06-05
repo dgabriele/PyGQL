@@ -7,7 +7,7 @@ from pygql.exceptions import (
     InvalidOperation,
     InvalidResult,
     FieldValidationError,
-    AmbiguousFieldError,
+    FieldAmbiguityError,
 )
 
 from pygql.schema import Schema
@@ -213,7 +213,7 @@ class Node(object):
             if counter[k] == 2:
                 duplicate_names.append(k)
         if duplicate_names:
-            raise AmbiguousFieldError(self, duplicate_names)
+            raise FieldAmbiguityError(self, duplicate_names)
 
     @classmethod
     def parse(cls, node):

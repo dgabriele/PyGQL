@@ -49,7 +49,7 @@ class InvalidOperation(PyGQL_Exception):
         })
 
 
-class AmbiguousFieldError(PyGQL_Exception):
+class FieldAmbiguityError(PyGQL_Exception):
     code = 3
     default_payload = {
         'message': 'ambiguous name or alias'
