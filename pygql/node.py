@@ -102,10 +102,7 @@ class Node(object):
             if path.context_class is not None:
                 node._build_context_and_validate(request, path)
 
-            # If node.fields is None, we don't execute the node because this
-            # means that there isn't any data to fetch, and child nodes have
-            # already executed in our depth-first traversal.
-            if node.fields:
+            if node != root_node:
                 result = node._execute_node(request, path)
                 node._process_result(result, label, path)
 
@@ -177,7 +174,10 @@ class Node(object):
                 if path.yields:
                     self._generate_state(request, node, path)
 
-        return result or {}
+        if result is None:
+            raise InvalidResult('result cannot be null')
+
+        return result
 
     def _build_context_and_validate(self, request, path):
         self.context = path.context_class(request, self)
