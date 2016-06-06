@@ -92,6 +92,8 @@ class Node(object):
         queue = cls._enqueue_nodes(root_label, root_node, root_path)
 
         for label, node, path in queue:
+            node.context = path.context_class(request, node)
+
             # Generate node.state for consumption by child nodes
             if path.yields and (not node._has_state):
                 node._generate_state(request, path)
@@ -100,7 +102,7 @@ class Node(object):
             # Instantiate the node's context and validate fields and child
             # nodes against the Schema instance returned by Context.authorize
             if path.context_class is not None:
-                node._build_context_and_validate(request, path)
+                node._authorize_and_validate_node(request, path)
 
             if node != root_node:
                 result = node._execute_node(request, path)
@@ -179,8 +181,7 @@ class Node(object):
 
         return result
 
-    def _build_context_and_validate(self, request, path):
-        self.context = path.context_class(request, self)
+    def _authorize_and_validate_node(self, request, path):
         self._schema = self.context.authorize(request, self)
         if self._schema is not None:
             # TODO: merge this logic to reduce number of times
