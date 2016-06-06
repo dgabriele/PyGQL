@@ -5,15 +5,15 @@ __all__ = ['Field', 'Schema']
 
 
 class Field(object):
-    def __init__(self, name:str=None, nested=False, authorized_field_maps:list=None):
+    def __init__(self, name:str=None, nested=False, roles:list=None):
         self.name = name
         self.nested = nested
-        self.authorized_field_maps = authorized_field_maps or []
+        self.roles = roles or []
 
 
 class Schema(object):
     def __init__(self, default_role=None):
-        self.default_role = default_role
+        self._default_role = default_role
 
         # inverse mapping from internal field names to public names
         self.inverse = {}
@@ -33,8 +33,8 @@ class Schema(object):
                 self.inverse[v.name] = k
                 fields = self.nested if v.nested else self.scalar
                 fields.keys.add(k)
-                if v.authorized_field_maps:
-                    for role in v.authorized_field_maps:
+                if v.roles:
+                    for role in v.roles:
                         fields.authorized_field_maps[role][k] = v.name
                 else:
                     fields.public_field_map[k] = v.name
@@ -50,10 +50,13 @@ class Schema(object):
     def __contains__(self, key):
         return (key in self.scalar.keys) or (key in self.nested.keys)
 
+    def set_default_role(self, role):
+        self._default_role = role
+
     def translate(self, keys:list, nested=False, role:str=None):
         valid = []
         unrecognized = []
-        role = role if role else self.default_role
+        role = role if role else self._default_role
         fields = self.nested if nested else self.scalar
         if role is not None:
             field_map = fields.authorized_field_maps[role]

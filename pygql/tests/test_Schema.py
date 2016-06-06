@@ -10,10 +10,10 @@ def roles():
 @pytest.fixture(scope='function')
 def schema(roles):
     class TestSchema(Schema):
-        id = Field('public_id', authorized_field_maps=roles)
-        name = Field('name', authorized_field_maps=roles)
-        email = Field('email', authorized_field_maps=['staff'])
-        company = Field('company', nested=True, authorized_field_maps=['staff'])
+        id = Field('public_id', roles=roles)
+        name = Field('name', roles=roles)
+        email = Field('email', roles=['staff'])
+        company = Field('company', nested=True, roles=['staff'])
         location = Field('location', nested=True)
         age = Field()
 
