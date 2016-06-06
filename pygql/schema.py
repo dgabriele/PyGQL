@@ -12,7 +12,9 @@ class Field(object):
 
 
 class Schema(object):
-    def __init__(self):
+    def __init__(self, default_role=None):
+        self.default_role = default_role
+
         # inverse mapping from internal field names to public names
         self.inverse = {}
 
@@ -51,6 +53,7 @@ class Schema(object):
     def translate(self, keys:list, nested=False, role:str=None):
         valid = []
         unrecognized = []
+        role = role if role else self.default_role
         fields = self.nested if nested else self.scalar
         if role is not None:
             field_map = fields.authorized_field_maps[role]
