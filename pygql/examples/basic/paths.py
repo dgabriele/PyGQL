@@ -8,7 +8,7 @@ from . import graph
 #
 
 class UserSchema(Schema):
-    id = Field('public_id')
+    id = Field(name='public_id')
     first_name = Field('first_name')
     last_name = Field('last_name')
     email = Field('email')
