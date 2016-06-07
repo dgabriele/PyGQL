@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, deque
 
 from graphql import parse
 from graphql.language.source import Source
@@ -8,6 +8,7 @@ from pygql.exceptions import (
     InvalidResult,
     FieldValidationError,
     FieldAmbiguityError,
+    NotFound,
 )
 
 from pygql.schema import Schema
@@ -18,11 +19,16 @@ from pygql.path import Path
 __all__ = ['Node']
 
 
+IDX_LABEL = 0
+IDX_NODE  = 1
+IDX_PATH  = 2
+IDX_IGNORE_RESULT = 3
+
+
 class RerouteException(Exception):
     def __init__(self, node, location:str):
         self.node = node
         self.location = location
-
 
 class Node(object):
     def __init__(self, root, parent=None):
@@ -74,8 +80,8 @@ class Node(object):
     def __contains__(self, child_name:str):
         return child_name in self.children
 
-    def reroute(self, location:str):
-        raise RerouteException(self, location)
+    def reroute(self, dotted_path:str):
+        raise RerouteException(self, dotted_path)
 
     @property
     def is_validated(self):
@@ -95,23 +101,39 @@ class Node(object):
         root_path = graph.root
 
         # Enqueue the nodes inte query in depth-first order
-        queue = cls._enqueue_nodes(request, root_label, root_node, root_path)
+        # and init their Contexts
+        queue = cls._enqueue(request, root_label, root_node, root_path)
+        while queue:
+            label, node, path, ignore = queue.popleft()
 
-        for label, node, path in queue:
             # Generate node.state for consumption by child nodes
             if path.yields and (not node._has_state):
                 node._generate_state(request, path)
                 continue
-            if node != root_node:
-                result = node._execute_node(request, path)
+
+            if node == root_node:
+                continue
+
+            # call node.execute
+            result = node._execute_node(request, path, ignore)
+
+            # translate the result and store in parent
+            if not ignore:
                 node._process_result(result, label, path)
 
         return root_node.result
 
     @classmethod
-    def _enqueue_nodes(cls, request, label, node, path, queue=None):
+    def _enqueue(cls, request, label, node, path, root_path=None, queue=None):
+
         if queue is None:
-            queue = []  # base case
+            queue = deque()  # base case
+            root_path = path
+
+        # ensure that some function has been registered by @graph for the
+        # given path.
+        if path.name != Path.ROOT_NAME and path.execute is None:
+            raise NotFound(path.name)
 
         # If the node has state (i.e. "yields"), it means that node.execute
         # is a generator function; therefore, we must invoke the generator once
@@ -119,13 +141,20 @@ class Node(object):
         # available to them. We will invoke the generator for a second and
         # final time in the usual depth-first order (i.e. after child nodes).
         if path.yields:
-            queue.append((label, node, path))
+            assert not path.has_redirect
+            queue.append((label, node, path, False))
+
+        redirect_path = None
+        if path.has_redirect:
+            assert not path.yields
+            redirect_path = root_path[path.redirect]
 
         # enqueue children
         for child_label, child_node in node.children.items():
-            child_path = path[child_node.name]
-            cls._enqueue_nodes(request, child_label,
-                               child_node, child_path, queue)
+            path_effective = redirect_path if path.has_redirect else path
+            child_path = path_effective[child_node.name]
+            cls._enqueue(request, child_label, child_node, child_path,
+                         root_path, queue=queue)
 
         # NOTE:
         # since context is instantiated in depth-first order, note that
@@ -137,7 +166,12 @@ class Node(object):
             node.schema = node.context.authorize(request, node)
             node._validate(request, path)
 
-        queue.append((label, node, path))
+        if path.has_redirect:
+            queue.append((label, node, path, True))
+            queue.append((label, node, redirect_path, False))
+        else:
+            queue.append((label, node, path, False))
+
         return queue
 
 
@@ -167,27 +201,15 @@ class Node(object):
         self.state = self._generator.send(None)
         self._has_state = True
 
-    def _execute_node(self, request, path):
-        while True:
-            # This loop is to retry node execution in case
-            # a RerouteException is raised.
-            try:
-                if not self._has_state:
-                    result = path.execute(request, self)
-                else:
-                    # this is for paths that "yield"
-                    result = self._generator.send(None)
-                    self._has_state = False
-                break
-            except RerouteException as exc:
-                # replace current path with new path
-                path = path.root[exc.location]
-                if path.yields:
-                    self._generate_state(request, node, path)
-
-        if result is None:
+    def _execute_node(self, request, path, ignore):
+        if not self._has_state:
+            result = path.execute(request, self)
+        else:
+            # this is for paths that "yield"
+            result = self._generator.send(None)
+            self._has_state = False
+        if result is None and not ignore:
             raise InvalidResult('result cannot be null')
-
         return result
 
     def _validate(self, request, path):

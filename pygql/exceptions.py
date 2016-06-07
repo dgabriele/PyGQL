@@ -79,3 +79,17 @@ class InvalidResult(PyGQL_Exception):
                 'type': type(result).__name__
             }
         })
+
+
+class NotFound(PyGQL_Exception):
+    code = 4
+    default_payload = {
+        'message': 'path function not registered'
+    }
+
+    def __init__(self, path:str):
+        super(NotFound, self).__init__({
+            'data': {
+                'path': path,
+            }
+        })

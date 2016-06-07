@@ -15,7 +15,8 @@ pprint(graph.execute(request, '''
     {
         project(id: "XYZ123") {
             assignee {
-                name
+                name,
+                location {lng, lat}
             }
         }
     }'''))

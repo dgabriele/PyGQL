@@ -19,18 +19,24 @@ def Graph():
         """
         # `root` is a global registry of GraphQL target callables stored in
         # a tree. It is the entry point to every defined path in the graph.
-        root = Path()
+        root = Path(name=Path.ROOT_NAME)
 
         def __init__(self,
                      path:object=None,
                      context:Context=None,
-                     yields:bool=False):
+                     yields:bool=False,
+                     redirect:str=None):
             """
             Args:
-                - `path`: a dotted path string or list of strings
-                - `context`: subclass of pygql.Context
-                - `yields`: indicates that the wrapped function is a generator
-                            which yields state to its child functions.
+                - `path`: A dotted path string or list of strings
+                - `context`: Subclass of pygql.Context
+                - `yields`: Indicates that the wrapped function is a generator
+                    which yields state to its child functions.
+                - `redirect`: This is a dotted path to an existing
+                    Path instance. If defined, the return value of the wrapped
+                    function will be ignored. It and all relative child nodes
+                    will now execute as though the redirect path was queried.
+
             """
             dotted_paths = set()
             if isinstance(path, str):
@@ -48,7 +54,8 @@ def Graph():
             # element of `a.children`.
             self._paths = []
             for dotted_path in dotted_paths:
-                path = self.root.traverse(dotted_path.split('.'))
+                path = self.root.traverse(dotted_path)
+                path.redirect = redirect
                 path.root = self.root
                 path.name = dotted_path
                 path.context_class = context
