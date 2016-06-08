@@ -46,7 +46,6 @@ def Graph():
                     dotted_paths.add(dotted_path)
 
             assert dotted_paths
-            assert (context is None) or issubclass(context, Context)
             assert not [x for x in dotted_paths if not isinstance(x, str)]
 
             # initialize each path in global tree. `self.root['a', 'b']`yields
