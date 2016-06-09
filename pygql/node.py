@@ -118,7 +118,7 @@ class Node(object):
             result = node._execute_node(request, path, ignore)
 
             # translate the result and store in parent
-            if not ignore:
+            if not (result is None or ignore):
                 node._process_result(result, label, path)
 
         return root_node.result
@@ -210,8 +210,6 @@ class Node(object):
             # this is for paths that "yield"
             result = self._generator.send(None)
             self._has_state = False
-        if result is None and not ignore:
-            raise InvalidResult('result cannot be null')
         return result
 
     def _validate(self, request, path):
