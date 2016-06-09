@@ -70,6 +70,9 @@ class Schema(object):
                 unrecognized.append(k_in)
         return (valid, unrecognized)
 
+    def keymap(self, keys:list):  # TODO: rename this somehow
+        return {k: self.inverse[k] for k in keys}
+
     def dump(self, obj:dict):
         return {
             self.inverse[k]: v for k, v in obj.items()

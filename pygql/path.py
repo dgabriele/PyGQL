@@ -46,11 +46,15 @@ class Path(object):
         would instantiate a nesting of paths called 'a', 'b', and 'c'. This is
         the same as doing root['a']['b']['c'].
         """
-        if not isinstance(key, (list, tuple)):
-            key = key.split('.')
-
         if not key:
-            path = self
+            return self
+
+        if not isinstance(key, (list, tuple)):
+            try:
+                key = key.split('.')
+            except:
+                import ipdb; ipdb.set_trace()
+
         path = self
         for k in key:
             path = path.children[k]

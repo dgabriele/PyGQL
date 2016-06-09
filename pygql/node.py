@@ -61,6 +61,9 @@ class Node(object):
         # merged into the parent node, if exists.
         self.result = {}
 
+        # Schema instance returned by Context.authorize method
+        self.schema = None
+
         # State generator. state can be passed down to child nodes.
         # this is set by nodes that have a corresponding Path with
         # yields == True.
@@ -69,10 +72,23 @@ class Node(object):
         # Flag that indicates that the generator was instantiated
         self._has_state = False
 
-        # Schema instance returned by Context.authorize method
-        self.schema = None
-
         self._is_validated = False
+
+    def copy(self):
+        copy = Node(self.root)
+        copy.name = self.name
+        copy.parent = self.parent
+        copy.schema = self.schema
+        copy.alias = self.alias
+        copy.children = self.children
+        copy.fields = self.fields
+        copy.state = self.state
+        copy.context = self.context
+        copy.result = self.result
+        copy._generator = self._generator
+        copy._has_state = self._has_state
+        copy._is_validated = self._is_validated
+        return copy
 
     def __getitem__(self, key:str):
         return self.children.get(key)
@@ -126,51 +142,79 @@ class Node(object):
     @classmethod
     def _enqueue(cls, request, label, node, path, root_path=None, queue=None):
 
+        # base case:
         if queue is None:
-            queue = deque()  # base case
+            queue = deque()
             root_path = path
 
-        # ensure that some function has been registered by @graph for the
-        # given path.
+        # ensure that some function has been registered
+        # by @graph for the given path.
         if path.name != Path.ROOT_NAME and path.execute is None:
             raise NotFound(path.name)
 
-        # If the node has state (i.e. "yields"), it means that node.execute
-        # is a generator function; therefore, we must invoke the generator once
-        # before any child nodes execute to ensure that parent state is
-        # available to them. We will invoke the generator for a second and
-        # final time in the usual depth-first order (i.e. after child nodes).
+        # If the node has state (i.e. "yields"), it means
+        # that node.execute is a generator function;
+        # therefore, we must invoke the generator before any
+        # child nodes execute to ensure that parent state is
+        # available to them. We will invoke the generator
+        # for a second and final time in the usual
+        # depth-first order (i.e. after child nodes).
         if path.yields:
             assert not path.has_redirect
             queue.append((label, node, path, False))
 
-        redirect_path = None
+        # Since one target redirect path can redirect to yet
+        # another, we collect the entire sequence of
+        # redirecting Paths. Later, we continue the
+        # recursive enqueue procedure relative to the tail
+        # Path of the sequence, but we still execute each
+        # one at this level of the recursion following
+        # said enqueuing.
+        redirect_paths = []
         if path.has_redirect:
-            assert not path.yields
-            redirect_path = root_path[path.redirect]
+            p = root_path[path.redirect]
+            while True:
+                assert not p.yields
+                redirect_paths.append(p)
+                if not p.has_redirect:
+                    break
+                p = root_path[p.redirect]
+            effective_path = redirect_paths[-1]
+        else:
+            effective_path = path
 
-        # enqueue children
+        # enqueue children relative to the effective path
         for child_label, child_node in node.children.items():
-            path_effective = redirect_path if path.has_redirect else path
-            child_path = path_effective[child_node.name]
-            cls._enqueue(request, child_label, child_node, child_path,
-                         root_path, queue=queue)
+            child_path = effective_path[child_node.name]
+            cls._enqueue(request,
+                         child_label, child_node, child_path,
+                         root_path=root_path, queue=queue)
+
+        if redirect_paths:
+            # executing redirect paths consists of passing
+            # the same node object to the sequence of
+            # path.execute functions.
+            for p in redirect_paths:
+                node_copy = node.copy() 
+                # XXX: do we want to update parent references?
+                if p.context_class:
+                    node_copy.context = p.context_class(request, node_copy)
+                    node_copy.schema = node_copy.context.authorize(request, node_copy)
+                    node_copy._validate(request, path)
+                queue.append((label, node_copy, p, True))
+        else:
+            queue.append((label, node, path, False))
 
         # NOTE:
-        # since context is instantiated in depth-first order, note that
+        # Since context is instantiated in depth-first order, note that
         # we would not have access to parent context from within any given
-        # child context unless with instantiated each context in a first passed
-        # preceding the node execution step.
-        if path.context_class and (not node.is_validated):
+        # child context unless with instantiated each context in a first
+        # passed preceding the node execution step.
+        if path.context_class is not None:
             node.context = path.context_class(request, node)
             node.schema = node.context.authorize(request, node)
             node._validate(request, path)
 
-        if path.has_redirect:
-            queue.append((label, node, path, True))
-            queue.append((label, node, redirect_path, False))
-        else:
-            queue.append((label, node, path, False))
 
         return queue
 
